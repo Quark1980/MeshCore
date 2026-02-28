@@ -640,7 +640,9 @@ class HomeScreen : public UIScreen {
             int ry = hist_y + (rows - 1 - shown) * 14;
             if (e.is_sent) {
                 display.setColor(e.status == 1 ? DisplayDriver::GREEN : DisplayDriver::RED);
-                display.drawTextEllipsized(x + 4, ry, 60, " Me"); // Small indicator
+                char tag[16];
+                snprintf(tag, sizeof(tag), " Me:%d", e.repeat_count);
+                display.drawTextEllipsized(x + 4, ry, 60, tag);
             } else {
                 display.setColor(DisplayDriver::BLUE);
                 display.drawTextEllipsized(x + 4, ry, 60, e.origin);
@@ -1419,6 +1421,7 @@ void UITask::storeMessage(uint8_t path_len, const char* from_name, const char* t
   e.is_group = is_group;
   e.is_sent = is_sent;
   e.status = 0; // pending
+  e.repeat_count = 0;
   e.ack_hash = ack_hash;
   StrHelper::strzcpy(e.origin, from_name, sizeof(e.origin));
   StrHelper::strzcpy(e.text, text, sizeof(e.text));
@@ -1428,6 +1431,7 @@ void UITask::updateMessageAck(uint32_t ack_hash) {
   for (int i = 0; i < _messages_count; i++) {
     if (_messages[i].ack_hash == ack_hash && _messages[i].is_sent) {
       _messages[i].status = 1; // Acked/Repeated
+      _messages[i].repeat_count++;
       return;
     }
   }

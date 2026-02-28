@@ -32,6 +32,7 @@ public:
     bool is_group;
     bool is_sent;     // true if sent from this device
     uint8_t status;  // 0=pending/none, 1=repeated/acked, 2=failed (optional)
+    uint8_t repeat_count; // number of times this message was heard repeated
     uint32_t ack_hash; // to match with incoming acks
   };
   void start();
