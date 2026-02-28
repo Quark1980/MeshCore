@@ -213,7 +213,9 @@ public:
 };
 
 class HomeScreen : public UIScreen {
+public:
   enum Tab { TAB_MESSAGES, TAB_NEARBY, TAB_CHAT, TAB_RADIO, TAB_LINK, TAB_POWER, TAB_OFFLINE, TAB_RAW, TAB_COUNT };
+private:
   Tab _tab;
 
   uint8_t _active_chat_idx;
@@ -233,6 +235,9 @@ class HomeScreen : public UIScreen {
   bool _power_armed;
   uint32_t _power_armed_until;
   AdvertPath recent[UI_RECENT_LIST_SIZE];
+
+  bool _msg_unread = false;
+  bool _chat_unread = false;
 
   UITask* _task;
   mesh::RTCClock* _rtc;
@@ -396,8 +401,17 @@ class HomeScreen : public UIScreen {
     for (int i = 0; i < TAB_COUNT; i++) {
       int y = tabY(i);
       bool active = (i == _tab);
+      bool unread = false;
+      if (i == TAB_MESSAGES && _msg_unread) unread = true;
+      if (i == TAB_CHAT && _chat_unread) unread = true;
 
-      display.setColor(active ? DisplayDriver::BLUE : DisplayDriver::DARK);
+      if (active) {
+          display.setColor(DisplayDriver::BLUE);
+      } else if (unread) {
+          display.setColor(DisplayDriver::GREEN);
+      } else {
+          display.setColor(DisplayDriver::DARK);
+      }
       display.fillRect(tab_x, y, tab_w, _tab_h);
 
       display.setColor(DisplayDriver::LIGHT);
@@ -912,13 +926,22 @@ public:
        _tab(TAB_MESSAGES), _show_msg_detail(false), _msg_cursor(0), _msg_scroll(0), _nearby_scroll(0),
        _active_chat_idx(0), _active_chat_is_group(true), _keyboard_visible(false), _kb_shift(0), _chat_scroll(0), _chat_dropdown_open(false),
        _radio_raw_mode(false),
-       _power_armed(false), _power_armed_until(0) {
+       _power_armed(false), _power_armed_until(0),
+       _msg_unread(false), _chat_unread(false) {
     _chat_draft[0] = 0;
+  }
+
+  void setUnread(Tab tab) {
+      if (tab == TAB_MESSAGES) _msg_unread = true;
+      if (tab == TAB_CHAT) _chat_unread = true;
   }
 
   int render(DisplayDriver& display) override {
     updateLayout(display);
     display.setTextSize(1);
+
+    if (_tab == TAB_MESSAGES) _msg_unread = false;
+    if (_tab == TAB_CHAT) _chat_unread = false;
 
     if (_power_armed && (int32_t)(_power_armed_until - millis()) <= 0) {
       _power_armed = false;
@@ -1469,10 +1492,18 @@ void UITask::msgRead(int msgcount) {
 
 void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount, uint8_t channel_idx, bool is_group) {
   _msgcount = msgcount;
-
+ 
   storeMessage(path_len, from_name, text, channel_idx, is_group);
+  
+  if (home != NULL) {
+      HomeScreen* hs = (HomeScreen*)home;
+      hs->setUnread(HomeScreen::TAB_MESSAGES);
+      if (channel_idx != 0xFF || is_group) {
+          hs->setUnread(HomeScreen::TAB_CHAT);
+      }
+  }
+
   setCurrScreen(home);
-  showAlert("New message", 700);
 
   if (_display != NULL) {
     if (!_display->isOn() && !hasConnection()) {
