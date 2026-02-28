@@ -39,17 +39,20 @@ The "TOUCH" edition introduces a refined tabbed interface:
 1.  **Messages**: View a history of all received messages. Tap a message to see full details and timestamps.
 2.  **Nearby**: See a list of nodes heard directly on the radio. Displays node names and "age" (how long ago they were last seen).
 3.  **Chat**: 
+    - **Default Channel**: Automatically selects the **Public** channel when opened.
     - **Channel Selector**: Dropdown to switch between group channels or private contacts.
     - **Keyboard**: A full on-screen QWERTY keyboard for composing messages.
-    - **Status**: Sent messages show "Me:x" — where 'x' is the number of times your message was heard repeated in the mesh!
+    - **Success Metrics**: Sent messages show "Me:x" — where 'x' is the number of times your message was heard repeated in the mesh!
 4.  **Link**: Manage your connectivity (Toggle BLE, view connection status).
 5.  **Radio**: Monitor raw radio activity and toggle specialized modes.
 6.  **Power**: Check battery voltage and long-press to Hibernate/Shutdown.
+7.  **Offline**: Indicates when the radio is disabled or disconnected.
 
 ### ✨ Advanced Display Features
 - **Double Buffering**: Flicker-free rendering using internal memory buffers.
-- **Repeat Counting**: Real-time feedback on message propagation (Green "Me:x" indicator).
+- **Quiet Notifications**: Replaced obstructive popups with subtle **Dark Green Tab Highlights** on the MSG and CHAT tabs.
 - **List Scrolling**: Dedicated "Up" and "Down" touch buttons for long message/node lists.
+- **Repeat Counting**: Green "Me:x" indicator for real-time mesh feedback.
 
 ## 🔍 What is MeshCore?
 MeshCore provides the ability to create wireless mesh networks, similar to Meshtastic but with a focus on lightweight multi-hop packet routing for embedded projects. It balances simplicity with scalability, making it ideal for custom hardware solutions.
