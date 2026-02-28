@@ -2,6 +2,33 @@
 
 MeshCore is a lightweight, portable C++ library that enables multi-hop packet routing for embedded projects using LoRa and other packet radios. It is designed for developers who want to create resilient, decentralized communication networks that work without the internet.
 
+## 💎 Featured Build: Heltec v4 TFT Touch Companion Radio
+
+This build features a custom Dark Mode UI optimized for the ST7789 320x240 TFT with XPT2046 touch support. It is the primary reference implementation for MeshCore's advanced GUI capabilities.
+
+#### ⚡ Quick Start
+You can download the pre-compiled binary here:
+- **[Download heltec_v4_tft_touch_companion_radio.bin](./bin/heltec_v4_tft_touch_companion_radio.bin)**
+
+#### 🔌 Wiring Diagram (Heltec v4 to ST7789 + XPT2046)
+
+| Component | Function | Heltec v4 Pin |
+|-----------|----------|---------------|
+| **TFT**   | SCLK     | GPIO 17       |
+| **TFT**   | MOSI/SDA | GPIO 33       |
+| **TFT**   | CS       | GPIO 15       |
+| **TFT**   | DC       | GPIO 16       |
+| **TFT**   | RESET    | GPIO 18       |
+| **TFT**   | LED/BL   | GPIO 21       |
+| **Touch** | T_CLK    | GPIO 17       |
+| **Touch** | T_DIN    | GPIO 33       |
+| **Touch** | T_DO     | GPIO 42       |
+| **Touch** | T_CS     | GPIO 3        |
+| **Touch** | T_IRQ    | GPIO 4        |
+
+> [!IMPORTANT]
+> SPI lines (SCLK and MOSI) are shared between the TFT and Touch controller. Ensure common grounds and appropriate power (VEXT/3.3V) are connected.
+
 ## 🔍 What is MeshCore?
 
 MeshCore now supports a range of LoRa devices, allowing for easy flashing without the need to compile firmware manually. Users can flash a pre-built binary using tools like Adafruit ESPTool and interact with the network through a serial console.
@@ -81,32 +108,9 @@ They can also be managed via LoRa in the mobile app by using the Remote Manageme
 
 MeshCore is designed for devices listed in the [MeshCore Flasher](https://flasher.meshcore.co.uk)
 
-### 💎 Featured Build: Heltec v4 TFT Touch Companion Radio
+## 🛠 Hardware Compatibility
 
-This build features a custom Dark Mode UI optimized for the ST7789 320x240 TFT with XPT2046 touch support.
-
-#### ⚡ Quick Start
-You can download the pre-compiled binary here:
-- [heltec_v4_tft_touch_companion_radio.bin](./bin/heltec_v4_tft_touch_companion_radio.bin)
-
-#### 🔌 Wiring Diagram (Heltec v4 to ST7789 + XPT2046)
-
-| Component | Function | Heltec v4 Pin |
-|-----------|----------|---------------|
-| **TFT**   | SCLK     | GPIO 17       |
-| **TFT**   | MOSI/SDA | GPIO 33       |
-| **TFT**   | CS       | GPIO 15       |
-| **TFT**   | DC       | GPIO 16       |
-| **TFT**   | RESET    | GPIO 18       |
-| **TFT**   | LED/BL   | GPIO 21       |
-| **Touch** | T_CLK    | GPIO 17       |
-| **Touch** | T_DIN    | GPIO 33       |
-| **Touch** | T_DO     | GPIO 42       |
-| **Touch** | T_CS     | GPIO 3        |
-| **Touch** | T_IRQ    | GPIO 4        |
-
-> [!NOTE]
-> SPI lines (SCLK and MOSI) are shared between the TFT and Touch controller. Ensure common grounds and appropriate power (VEXT/3.3V) are connected.
+MeshCore is designed for devices listed in the [MeshCore Flasher](https://flasher.meshcore.co.uk)
 
 ## 📜 License
 
