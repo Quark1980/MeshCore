@@ -177,20 +177,32 @@ public:
     display.setColor(DisplayDriver::DARK);
     display.fillRect(0, 0, display.width(), display.height());
 
-    // meshcore logo
+    int mid_x = display.width() / 2;
+
+    // 1. MeshCore Logo
     display.setColor(DisplayDriver::LIGHT);
     int logoWidth = 128;
-    display.drawXbm((display.width() - logoWidth) / 2, 3, meshcore_logo, logoWidth, 13);
+    display.drawXbm(mid_x - 64, 15, meshcore_logo, logoWidth, 13);
 
-    // version info
-    display.setColor(DisplayDriver::LIGHT);
-    display.setTextSize(2);
-    display.drawTextCentered(display.width()/2, 22, _version_info);
-
+    // 2. Base attribution
     display.setTextSize(1);
-    display.drawTextCentered(display.width()/2, 42, FIRMWARE_BUILD_DATE);
+    char base_info[64];
+    snprintf(base_info, sizeof(base_info), "Powered by MeshCore %s", _version_info);
+    display.drawTextCentered(mid_x, 35, base_info);
 
-    return 2000;
+    // 3. Large "TOUCH" Headline
+    display.setTextSize(6);
+    display.drawTextCentered(mid_x, 85, "TOUCH");
+
+    // 4. Touch Version & Date
+    display.setTextSize(2);
+    display.drawTextCentered(mid_x, 155, "v1.1.0 - 2026.02.28");
+
+    // 5. Author Credit
+    display.setTextSize(1);
+    display.drawTextCentered(mid_x, 210, "Created by Quark1980");
+
+    return 2000; // Splash redrawn every 2s is plenty
   }
 
   void poll() override {
