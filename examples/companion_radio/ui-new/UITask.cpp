@@ -651,12 +651,25 @@ class HomeScreen : public UIScreen {
   }
 
   void renderKeyboard(DisplayDriver& display) {
-    int kb_h = 100;
+    int kb_h = 160;
     int kb_y = _screen_h - kb_h;
     display.setColor(DisplayDriver::DARK);
     display.fillRect(0, kb_y, _screen_w, kb_h);
     display.setColor(DisplayDriver::LIGHT);
-    display.fillRect(0, kb_y, _screen_w, 1);
+    display.drawRect(0, kb_y, _screen_w, kb_h);
+
+    // Text Preview at top of keyboard
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(2, kb_y + 2, _screen_w - 4, 28);
+    display.setColor(DisplayDriver::LIGHT);
+    display.drawRect(1, kb_y + 1, _screen_w - 2, 30);
+    if (_chat_draft[0] == 0) {
+        display.setColor(DisplayDriver::GREY);
+        display.drawTextLeftAlign(6, kb_y + 8, "Type message...");
+    } else {
+        display.setColor(DisplayDriver::LIGHT);
+        display.drawTextLeftAlign(6, kb_y + 8, _chat_draft);
+    }
 
     const char* rows[3];
     if (_kb_shift == 0) {
@@ -673,9 +686,9 @@ class HomeScreen : public UIScreen {
         rows[2] = ".,?!'#";
     }
 
-    int ky = kb_y + 6;
+    int ky = kb_y + 36;
     int kw = _screen_w / 10;
-    int kh = 22;
+    int kh = 26;
 
     for (int r = 0; r < 3; r++) {
         int len = strlen(rows[r]);
@@ -688,10 +701,10 @@ class HomeScreen : public UIScreen {
 
     // Special keys
     int bottom_y = ky + 3 * (kh + 4);
-    drawKey(display, 4, bottom_y, 40, kh, _kb_shift == 0 ? "ABC" : "abc");
-    drawKey(display, 50, bottom_y, 140, kh, "SPACE");
-    drawKey(display, 196, bottom_y, 50, kh, "BKSP");
-    drawKey(display, 252, bottom_y, 64, kh, "SEND");
+    drawKey(display, 4, bottom_y, 45, kh, _kb_shift == 0 ? "ABC" : "abc");
+    drawKey(display, 55, bottom_y, 130, kh, "SPACE");
+    drawKey(display, 190, bottom_y, 55, kh, "BKSP");
+    drawKey(display, 250, bottom_y, 65, kh, "SEND");
   }
 
   void drawKey(DisplayDriver& display, int x, int y, int w, int h, const char* label) {
@@ -969,6 +982,80 @@ public:
   }
 
   bool handleTouch(int x, int y) override {
+    if (_keyboard_visible) {
+        int kb_h = 160;
+        int kb_y = _screen_h - kb_h;
+        if (y >= kb_y) {
+            int ky = kb_y + 36;
+            int kh = 26;
+            int kw = _screen_w / 10;
+            
+            // Check special keys first (bottom row)
+            int bottom_y = ky + 3 * (kh + 4);
+            if (isInRect(x, y, 4, bottom_y, 45, kh)) {
+                _kb_shift = (_kb_shift + 1) % 3;
+                return true;
+            }
+            if (isInRect(x, y, 55, bottom_y, 130, kh)) {
+                int len = strlen(_chat_draft);
+                if (len < sizeof(_chat_draft) - 1) {
+                    _chat_draft[len] = ' ';
+                    _chat_draft[len+1] = 0;
+                }
+                return true;
+            }
+            if (isInRect(x, y, 190, bottom_y, 55, kh)) {
+                int len = strlen(_chat_draft);
+                if (len > 0) _chat_draft[len-1] = 0;
+                return true;
+            }
+            if (isInRect(x, y, 250, bottom_y, 65, kh)) {
+                // SEND
+                if (_chat_draft[0] != 0 && _active_chat_idx != 0xFF) {
+                    if (_active_chat_is_group) {
+                        ChannelDetails ch;
+                        if (the_mesh.getChannel(_active_chat_idx, ch)) {
+                            the_mesh.sendGroupMessage(_rtc->getCurrentTime(), ch.channel, _node_prefs->node_name, _chat_draft, strlen(_chat_draft));
+                        }
+                    } else {
+                        ContactInfo ci;
+                        if (the_mesh.getContactByIdx(_active_chat_idx, ci)) {
+                            uint32_t expected_ack, est_timeout;
+                            the_mesh.sendMessage(ci, _rtc->getCurrentTime(), 0, _chat_draft, expected_ack, est_timeout);
+                        }
+                    }
+                    _chat_draft[0] = 0;
+                    _keyboard_visible = false;
+                }
+                return true;
+            }
+
+            // Regular rows
+            const char* krows[3];
+            if (_kb_shift == 0) { krows[0] = "qwertyuiop"; krows[1] = "asdfghjkl"; krows[2] = "zxcvbnm"; }
+            else if (_kb_shift == 1) { krows[0] = "QWERTYUIOP"; krows[1] = "ASDFGHJKL"; krows[2] = "ZXCVBNM"; }
+            else { krows[0] = "1234567890"; krows[1] = "-/()$&@\""; krows[2] = ".,?!'#"; }
+
+            for (int r = 0; r < 3; r++) {
+                int ry = ky + r * (kh + 4);
+                if (y >= ry && y < ry + kh) {
+                    int len = strlen(krows[r]);
+                    int ox = (_screen_w - (len * kw)) / 2;
+                    if (x >= ox && x < ox + len * kw) {
+                        int c_idx = (x - ox) / kw;
+                        int d_len = strlen(_chat_draft);
+                        if (d_len < sizeof(_chat_draft) - 1) {
+                            _chat_draft[d_len] = krows[r][c_idx];
+                            _chat_draft[d_len+1] = 0;
+                        }
+                        return true;
+                    }
+                }
+            }
+            return true; // Absorb all touches in KB area
+        }
+    }
+
     if (x < _rail_w) {
       for (int tab = 0; tab < TAB_COUNT; tab++) {
         if (isInRect(x, y, 0, tabY(tab), _rail_w, _tab_h)) {
