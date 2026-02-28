@@ -23,6 +23,16 @@
 #include "../NodePrefs.h"
 
 class UITask : public AbstractUITask {
+public:
+  struct MessageEntry {
+    uint32_t timestamp;
+    char origin[32];
+    char text[96];
+  };
+
+private:
+  static const int MAX_STORED_MESSAGES = 24;
+
   DisplayDriver* _display;
   SensorManager* _sensors;
 #ifdef PIN_BUZZER
@@ -52,8 +62,12 @@ class UITask : public AbstractUITask {
   UIScreen* home;
   UIScreen* msg_preview;
   UIScreen* curr;
+  MessageEntry _messages[MAX_STORED_MESSAGES];
+  int _messages_head = -1;      // newest entry index in ring
+  int _messages_count = 0;      // number of valid entries
 
   void userLedHandler();
+  void storeMessage(uint8_t path_len, const char* from_name, const char* text);
 
   // Button action handlers
   char checkDisplayOn(char c);
@@ -75,6 +89,8 @@ public:
   void gotoHomeScreen() { setCurrScreen(home); }
   void showAlert(const char* text, int duration_millis);
   int  getMsgCount() const { return _msgcount; }
+  int  getStoredMessageCount() const { return _messages_count; }
+  bool getStoredMessage(int newest_index, MessageEntry& out) const;
   bool hasDisplay() const { return _display != NULL; }
   bool isButtonPressed() const;
 

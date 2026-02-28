@@ -128,6 +128,10 @@
 
 #define MAX_SIGN_DATA_LEN               (8 * 1024) // 8K
 
+#ifndef UI_SHOW_PACKET_ACTIVITY
+  #define UI_SHOW_PACKET_ACTIVITY 0
+#endif
+
 // Auto-add config bitmask
 // Bit 0: If set, overwrite oldest non-favourite contact when contacts file is full
 // Bits 1-4: these indicate which contact types to auto-add when manual_contact_mode = 0x01
@@ -727,6 +731,18 @@ void MyMesh::onControlDataRecv(mesh::Packet *packet) {
   } else {
     MESH_DEBUG_PRINTLN("onControlDataRecv(), data received while app offline");
   }
+
+#if defined(DISPLAY_CLASS) && UI_SHOW_PACKET_ACTIVITY
+  if (_ui) {
+    char summary[96];
+    uint8_t path_len = packet->isRouteFlood() ? packet->path_len : 0xFF;
+    snprintf(summary, sizeof(summary), "CTRL len:%u RSSI:%d SNR:%.1f",
+             (unsigned)packet->payload_len,
+             (int)(_radio->getLastRSSI()),
+             (double)_radio->getLastSNR());
+    _ui->newMsg(path_len, "Radio", summary, offline_queue_len);
+  }
+#endif
 }
 
 void MyMesh::onRawDataRecv(mesh::Packet *packet) {
@@ -747,6 +763,18 @@ void MyMesh::onRawDataRecv(mesh::Packet *packet) {
   } else {
     MESH_DEBUG_PRINTLN("onRawDataRecv(), data received while app offline");
   }
+
+#if defined(DISPLAY_CLASS) && UI_SHOW_PACKET_ACTIVITY
+  if (_ui) {
+    char summary[96];
+    uint8_t path_len = packet->isRouteFlood() ? packet->path_len : 0xFF;
+    snprintf(summary, sizeof(summary), "RAW len:%u RSSI:%d SNR:%.1f",
+             (unsigned)packet->payload_len,
+             (int)(_radio->getLastRSSI()),
+             (double)_radio->getLastSNR());
+    _ui->newMsg(path_len, "Radio", summary, offline_queue_len);
+  }
+#endif
 }
 
 void MyMesh::onTraceRecv(mesh::Packet *packet, uint32_t tag, uint32_t auth_code, uint8_t flags,

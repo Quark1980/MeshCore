@@ -4,7 +4,10 @@
 HeltecV4Board board;
 
 #if defined(P_LORA_SCLK)
-  static SPIClass spi;
+  #ifndef LORA_SPI_BUS
+    #define LORA_SPI_BUS HSPI
+  #endif
+  static SPIClass spi(LORA_SPI_BUS);
   RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, spi);
 #else
   RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY);
@@ -30,7 +33,13 @@ AutoDiscoverRTCClock rtc_clock(fallback_clock);
 
 bool radio_init() {
   fallback_clock.begin();
+#if defined(PIN_BOARD_SDA) && defined(PIN_BOARD_SCL)
+  #if PIN_BOARD_SDA >= 0 && PIN_BOARD_SCL >= 0
+    rtc_clock.begin(Wire);
+  #endif
+#else
   rtc_clock.begin(Wire);
+#endif
   
 #if defined(P_LORA_SCLK)
   return radio.std_init(&spi);

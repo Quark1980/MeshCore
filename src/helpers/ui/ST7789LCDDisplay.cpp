@@ -12,6 +12,14 @@
   #define DISPLAY_SCALE_Y 3.75f // 240 / 64
 #endif
 
+#ifndef DISPLAY_CLEAR_EVERY_FRAME
+  #define DISPLAY_CLEAR_EVERY_FRAME 0
+#endif
+
+#ifndef DISPLAY_INVERT_COLORS
+  #define DISPLAY_INVERT_COLORS true
+#endif
+
 #define DISPLAY_WIDTH 240
 #define DISPLAY_HEIGHT 320
 
@@ -43,6 +51,8 @@ bool ST7789LCDDisplay::begin() {
     display.setRotation(DISPLAY_ROTATION);
 
     display.setSPISpeed(40e6);
+
+    display.invertDisplay(DISPLAY_INVERT_COLORS);
 
     display.fillScreen(ST77XX_BLACK);
     display.setTextColor(ST77XX_WHITE);
@@ -77,11 +87,18 @@ void ST7789LCDDisplay::turnOff() {
 }
 
 void ST7789LCDDisplay::clear() {
-  display.fillScreen(ST77XX_BLACK);
+  display.invertDisplay(DISPLAY_INVERT_COLORS);
+
+    display.fillScreen(ST77XX_BLACK);
 }
 
 void ST7789LCDDisplay::startFrame(Color bkg) {
-  display.fillScreen(ST77XX_BLACK);
+  (void)bkg;
+#if DISPLAY_CLEAR_EVERY_FRAME
+  display.invertDisplay(DISPLAY_INVERT_COLORS);
+
+    display.fillScreen(ST77XX_BLACK);
+#endif
   display.setTextColor(ST77XX_WHITE);
   display.setTextSize(1 * DISPLAY_SCALE_X); // This one affects size of Please wait... message
   display.cp437(true); // Use full 256 char 'Code Page 437' font
@@ -98,6 +115,9 @@ void ST7789LCDDisplay::setColor(Color c) {
       break;
     case DisplayDriver::LIGHT : 
       _color = ST77XX_WHITE;
+      break;
+    case DisplayDriver::GREY :
+      _color = 0x7BEF;
       break;
     case DisplayDriver::RED : 
       _color = ST77XX_RED;

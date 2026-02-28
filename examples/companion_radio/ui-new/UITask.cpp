@@ -2,6 +2,10 @@
 #include <helpers/TxtDataHelpers.h>
 #include "../MyMesh.h"
 #include "target.h"
+#if defined(TOUCH_CS) && defined(TOUCH_IRQ) && defined(TOUCH_SPI_SCK) && defined(TOUCH_SPI_MOSI) && defined(TOUCH_SPI_MISO)
+  #include <SPI.h>
+  #include <XPT2046_Touchscreen.h>
+#endif
 #ifdef WIFI_SSID
   #include <WiFi.h>
 #endif
@@ -29,7 +33,125 @@
   #define PRESS_LABEL "long press"
 #endif
 
+#if defined(TOUCH_CS) && defined(TOUCH_IRQ) && defined(TOUCH_SPI_SCK) && defined(TOUCH_SPI_MOSI) && defined(TOUCH_SPI_MISO)
+  #ifndef TOUCH_ROTATION
+    #define TOUCH_ROTATION 1
+  #endif
+  #ifndef TOUCH_X_MIN
+    #define TOUCH_X_MIN 200
+  #endif
+  #ifndef TOUCH_X_MAX
+    #define TOUCH_X_MAX 3900
+  #endif
+  #ifndef TOUCH_Y_MIN
+    #define TOUCH_Y_MIN 200
+  #endif
+  #ifndef TOUCH_Y_MAX
+    #define TOUCH_Y_MAX 3900
+  #endif
+  #ifndef TOUCH_DOT_MILLIS
+    #define TOUCH_DOT_MILLIS 220
+  #endif
+
+  static SPIClass xpt2046_spi(HSPI);
+  static XPT2046_Touchscreen xpt2046(TOUCH_CS, TOUCH_IRQ);
+  static bool xpt2046_ready = false;
+  static bool xpt2046_was_down = false;
+  static uint32_t xpt2046_last_tap_millis = 0;
+  static int touch_dot_x = -1;
+  static int touch_dot_y = -1;
+  static uint32_t touch_dot_until = 0;
+
+  static float normalizeTouchAxis(int raw, int in_min, int in_max) {
+    if (in_min == in_max) return 0.0f;
+    float n = (float)(raw - in_min) / (float)(in_max - in_min);
+    if (n < 0.0f) n = 0.0f;
+    if (n > 1.0f) n = 1.0f;
+    return n;
+  }
+
+  static void mapRawTouchToDisplay(DisplayDriver* display, int raw_x, int raw_y, int* x, int* y) {
+    if (display == NULL) {
+      *x = 0;
+      *y = 0;
+      return;
+    }
+
+    float u = normalizeTouchAxis(raw_x, TOUCH_X_MIN, TOUCH_X_MAX);
+    float v = normalizeTouchAxis(raw_y, TOUCH_Y_MIN, TOUCH_Y_MAX);
+
+    // Rotate touch frame by 90 degrees clockwise.
+    float u_rot = v;
+    float v_rot = 1.0f - u;
+
+    int max_x = display->width() - 1;
+    int max_y = display->height() - 1;
+    *x = (int)(u_rot * max_x + 0.5f);
+    *y = (int)(v_rot * max_y + 0.5f);
+
+    if (*x < 0) *x = 0;
+    if (*x > max_x) *x = max_x;
+    if (*y < 0) *y = 0;
+    if (*y > max_y) *y = max_y;
+  }
+
+  static char mapXpt2046TouchToKey(DisplayDriver* display, int raw_x, int raw_y) {
+    if (display == NULL) return KEY_NEXT;
+    int x = 0, y = 0;
+    mapRawTouchToDisplay(display, raw_x, raw_y, &x, &y);
+    int left_cutoff = display->width() / 3;
+    int right_cutoff = (display->width() * 2) / 3;
+    if (x < left_cutoff) return KEY_PREV;
+    if (x > right_cutoff) return KEY_NEXT;
+    return KEY_ENTER;
+  }
+
+  static void updateTouchDot(DisplayDriver* display, int raw_x, int raw_y) {
+    if (display == NULL) return;
+    mapRawTouchToDisplay(display, raw_x, raw_y, &touch_dot_x, &touch_dot_y);
+    touch_dot_until = millis() + TOUCH_DOT_MILLIS;
+  }
+
+  static void drawTouchDotPixel(DisplayDriver& display, int x, int y) {
+    if (x < 0 || y < 0 || x >= display.width() || y >= display.height()) return;
+    display.fillRect(x, y, 1, 1);
+  }
+
+  static void drawTouchDebugDot(DisplayDriver& display) {
+    if ((int32_t)(touch_dot_until - millis()) <= 0) return;
+    if (touch_dot_x < 0 || touch_dot_y < 0) return;
+
+    display.setColor(DisplayDriver::LIGHT);
+    drawTouchDotPixel(display, touch_dot_x, touch_dot_y - 2);
+    drawTouchDotPixel(display, touch_dot_x + 1, touch_dot_y - 1);
+    drawTouchDotPixel(display, touch_dot_x + 2, touch_dot_y);
+    drawTouchDotPixel(display, touch_dot_x + 1, touch_dot_y + 1);
+    drawTouchDotPixel(display, touch_dot_x, touch_dot_y + 2);
+    drawTouchDotPixel(display, touch_dot_x - 1, touch_dot_y + 1);
+    drawTouchDotPixel(display, touch_dot_x - 2, touch_dot_y);
+    drawTouchDotPixel(display, touch_dot_x - 1, touch_dot_y - 1);
+    drawTouchDotPixel(display, touch_dot_x, touch_dot_y);
+  }
+#endif
+
 #include "icons.h"
+
+// 8x8 tab icons for compact left-side rail
+static const uint8_t tab_icon_messages[] = {
+  0x00, 0x7E, 0x42, 0x5A, 0x66, 0x42, 0x7E, 0x00
+};
+static const uint8_t tab_icon_nearby[] = {
+  0x10, 0x38, 0x7C, 0x10, 0x10, 0x28, 0x44, 0x00
+};
+static const uint8_t tab_icon_radio[] = {
+  0x10, 0x18, 0x5C, 0x7E, 0x5C, 0x18, 0x10, 0x00
+};
+static const uint8_t tab_icon_link[] = {
+  0x0C, 0x12, 0x30, 0x0C, 0x06, 0x09, 0x30, 0x00
+};
+static const uint8_t tab_icon_power[] = {
+  0x18, 0x18, 0x18, 0x7E, 0xC3, 0xC3, 0x7E, 0x00
+};
 
 class SplashScreen : public UIScreen {
   UITask* _task;
@@ -52,8 +174,11 @@ public:
   }
 
   int render(DisplayDriver& display) override {
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(0, 0, display.width(), display.height());
+
     // meshcore logo
-    display.setColor(DisplayDriver::BLUE);
+    display.setColor(DisplayDriver::LIGHT);
     int logoWidth = 128;
     display.drawXbm((display.width() - logoWidth) / 2, 3, meshcore_logo, logoWidth, 13);
 
@@ -65,7 +190,7 @@ public:
     display.setTextSize(1);
     display.drawTextCentered(display.width()/2, 42, FIRMWARE_BUILD_DATE);
 
-    return 1000;
+    return 0;
   }
 
   void poll() override {
@@ -76,381 +201,677 @@ public:
 };
 
 class HomeScreen : public UIScreen {
-  enum HomePage {
-    FIRST,
-    RECENT,
-    RADIO,
-    BLUETOOTH,
-    ADVERT,
-#if ENV_INCLUDE_GPS == 1
-    GPS,
-#endif
-#if UI_SENSORS_PAGE == 1
-    SENSORS,
-#endif
-    SHUTDOWN,
-    Count    // keep as last
+  enum Tab {
+    TAB_MESSAGES,
+    TAB_NEARBY,
+    TAB_RADIO,
+    TAB_LINK,
+    TAB_POWER,
+    TAB_COUNT
   };
 
   UITask* _task;
   mesh::RTCClock* _rtc;
   SensorManager* _sensors;
   NodePrefs* _node_prefs;
-  uint8_t _page;
-  bool _shutdown_init;
+  uint8_t _tab;
+  bool _show_msg_detail;
+  int _msg_cursor;
+  int _msg_scroll;
+  bool _power_armed;
+  uint32_t _power_armed_until;
+  bool _radio_raw_mode;
   AdvertPath recent[UI_RECENT_LIST_SIZE];
 
+  // Cached layout (updated every render).
+  int _screen_w = 320;
+  int _screen_h = 240;
+  int _rail_w = 56;
+  int _tab_top = 6;
+  int _tab_h = 42;
+  int _tab_gap = 4;
+  int _content_x = 62;
+  int _content_w = 252;
+  int _header_h = 34;
+  int _list_y = 44;
+  int _row_h = 24;
+  int _list_rows = 8;
+  int _link_btn_h = 34;
+  int _link_ble_btn_y = 94;
+  int _link_adv_btn_y = 140;
+  int _power_btn_y = 104;
+  int _power_btn_h = 48;
+  int _radio_toggle_y = 48;
+  int _radio_toggle_h = 20;
+  int _radio_toggle_w = 100;
+  int _radio_reset_y = 204;
+  int _radio_reset_h = 24;
 
-  void renderBatteryIndicator(DisplayDriver& display, uint16_t batteryMilliVolts) {
-    // Convert millivolts to percentage
-#ifndef BATT_MIN_MILLIVOLTS
-  #define BATT_MIN_MILLIVOLTS 3000
-#endif
-#ifndef BATT_MAX_MILLIVOLTS
-  #define BATT_MAX_MILLIVOLTS 4200
-#endif
-    const int minMilliVolts = BATT_MIN_MILLIVOLTS;
-    const int maxMilliVolts = BATT_MAX_MILLIVOLTS;
-    int batteryPercentage = ((batteryMilliVolts - minMilliVolts) * 100) / (maxMilliVolts - minMilliVolts);
-    if (batteryPercentage < 0) batteryPercentage = 0; // Clamp to 0%
-    if (batteryPercentage > 100) batteryPercentage = 100; // Clamp to 100%
+  void updateLayout(DisplayDriver& display) {
+    _screen_w = display.width();
+    _screen_h = display.height();
 
-    // battery icon
-    int iconWidth = 24;
-    int iconHeight = 10;
-    int iconX = display.width() - iconWidth - 5; // Position the icon near the top-right corner
-    int iconY = 0;
-    display.setColor(DisplayDriver::GREEN);
+    _rail_w = (_screen_w >= 300) ? 40 : 25;
+    _tab_top = (_screen_h >= 220) ? 6 : 4;
+    _tab_gap = (_screen_h >= 220) ? 4 : 2;
+    _tab_h = (_screen_h - _tab_top * 2 - (TAB_COUNT - 1) * _tab_gap) / TAB_COUNT;
+    if (_tab_h < 16) _tab_h = 16;
 
-    // battery outline
-    display.drawRect(iconX, iconY, iconWidth, iconHeight);
+    _content_x = _rail_w + 6;
+    _content_w = _screen_w - _content_x - 6;
+    if (_content_w < 24) _content_w = 24;
 
-    // battery "cap"
-    display.fillRect(iconX + iconWidth, iconY + (iconHeight / 4), 3, iconHeight / 2);
+    _header_h = (_screen_h >= 220) ? 34 : (_screen_h >= 180 ? 28 : 22);
+    _row_h = (_screen_h >= 220) ? 24 : (_screen_h >= 180 ? 20 : 14);
+    _list_y = _header_h + 10;
+    _list_rows = (_screen_h - _list_y - 8) / _row_h;
+    if (_list_rows < 1) _list_rows = 1;
+    if (_list_rows > 8) _list_rows = 8;
 
-    // fill the battery based on the percentage
-    int fillWidth = (batteryPercentage * (iconWidth - 4)) / 100;
-    display.fillRect(iconX + 2, iconY + 2, fillWidth, iconHeight - 4);
+    _link_btn_h = (_screen_h >= 220) ? 34 : (_screen_h >= 180 ? 28 : 20);
+    _link_ble_btn_y = _list_y + (_screen_h >= 220 ? 48 : 34);
+    _link_adv_btn_y = _link_ble_btn_y + _link_btn_h + (_screen_h >= 220 ? 12 : 8);
 
-    // show muted icon if buzzer is muted
-#ifdef PIN_BUZZER
-    if (_task->isBuzzerQuiet()) {
-      display.setColor(DisplayDriver::RED);
-      display.drawXbm(iconX - 9, iconY + 1, muted_icon, 8, 8);
-    }
-#endif
+    _power_btn_h = (_screen_h >= 220) ? 48 : (_screen_h >= 180 ? 34 : 20);
+    _power_btn_y = _list_y + (_screen_h >= 220 ? 60 : 36);
+
+    _radio_toggle_h = (_screen_h >= 220) ? 20 : 16;
+    _radio_toggle_y = _list_y + 4;
+    _radio_toggle_w = (_content_w - 20) / 2;
+    if (_radio_toggle_w < 36) _radio_toggle_w = 36;
+
+    _radio_reset_h = (_screen_h >= 220) ? 24 : 18;
+    _radio_reset_y = _screen_h - _radio_reset_h - 8;
   }
 
-  CayenneLPP sensors_lpp;
-  int sensors_nb = 0;
-  bool sensors_scroll = false;
-  int sensors_scroll_offset = 0;
-  int next_sensors_refresh = 0;
-  
-  void refresh_sensors() {
-    if (millis() > next_sensors_refresh) {
-      sensors_lpp.reset();
-      sensors_nb = 0;
-      sensors_lpp.addVoltage(TELEM_CHANNEL_SELF, (float)board.getBattMilliVolts() / 1000.0f);
-      sensors.querySensors(0xFF, sensors_lpp);
-      LPPReader reader (sensors_lpp.getBuffer(), sensors_lpp.getSize());
-      uint8_t channel, type;
-      while(reader.readHeader(channel, type)) {
-        reader.skipData(type);
-        sensors_nb ++;
+  int tabY(int idx) const {
+    return _tab_top + idx * (_tab_h + _tab_gap);
+  }
+
+  bool isInRect(int x, int y, int rx, int ry, int rw, int rh) const {
+    return (x >= rx) && (y >= ry) && (x < rx + rw) && (y < ry + rh);
+  }
+
+  const uint8_t* tabIcon(uint8_t i) const {
+    switch (i) {
+      case TAB_MESSAGES: return tab_icon_messages;
+      case TAB_NEARBY: return tab_icon_nearby;
+      case TAB_RADIO: return tab_icon_radio;
+      case TAB_LINK: return tab_icon_link;
+      case TAB_POWER: return tab_icon_power;
+      default: return tab_icon_messages;
+    }
+  }
+
+  const char* tabLabel(uint8_t i) const {
+    switch (i) {
+      case TAB_MESSAGES: return "MSG";
+      case TAB_NEARBY: return "NBR";
+      case TAB_RADIO: return "RF";
+      case TAB_LINK: return "BLE";
+      case TAB_POWER: return "PWR";
+      default: return "TAB";
+    }
+  }
+
+  void formatAge(uint32_t timestamp, char* out, size_t out_len) {
+    int secs = (int)(_rtc->getCurrentTime() - timestamp);
+    if (secs < 0) secs = 0;
+    if (secs < 60) {
+      snprintf(out, out_len, "%ds", secs);
+    } else if (secs < 3600) {
+      snprintf(out, out_len, "%dm", secs / 60);
+    } else {
+      snprintf(out, out_len, "%dh", secs / 3600);
+    }
+  }
+
+  void drawChrome(DisplayDriver& display, const char* title) {
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(0, 0, _screen_w, _screen_h);
+
+    // Battery & Node Name parsing remains the same
+    char node[sizeof(_node_prefs->node_name)];
+    display.translateUTF8ToBlocks(node, _node_prefs->node_name, sizeof(node));
+    int batt_mv = _task->getBattMilliVolts();
+    int batt_pct = (batt_mv - 3300) * 100 / 900;
+    if (batt_pct < 0) batt_pct = 0;
+    if (batt_pct > 100) batt_pct = 100;
+
+    int batt_w = 22;
+    int batt_h = 9;
+    int batt_x = _content_x + _content_w - batt_w - 8;
+    int batt_y = 4;
+
+    display.setColor(DisplayDriver::LIGHT);
+    display.drawRect(batt_x, batt_y, batt_w, batt_h);
+    display.fillRect(batt_x + batt_w, batt_y + 2, 2, batt_h - 4);
+    int batt_fill = ((batt_w - 2) * batt_pct) / 100;
+    if (batt_fill > 0) {
+      display.setColor(DisplayDriver::LIGHT);
+      display.fillRect(batt_x + 1, batt_y + 1, batt_fill, batt_h - 2);
+    }
+
+    int node_w = batt_x - _content_x - 8;
+    if (node_w < 20) node_w = 20;
+    display.setColor(DisplayDriver::LIGHT);
+    display.drawTextEllipsized(_content_x + 4, 3, node_w, node);
+
+    char batt_txt[8];
+    snprintf(batt_txt, sizeof(batt_txt), "%d%%", batt_pct);
+    display.drawTextRightAlign(batt_x - 4, 4, batt_txt);
+
+    display.setColor(DisplayDriver::LIGHT);
+    display.drawTextLeftAlign(_content_x + 4, _header_h - 12, title);
+  }
+
+  void drawTabRail(DisplayDriver& display) {
+    int tab_x = 4;
+    int tab_w = _rail_w - 8;
+    for (int i = 0; i < TAB_COUNT; i++) {
+      int y = tabY(i);
+      bool active = (i == _tab);
+
+      display.setColor(active ? DisplayDriver::BLUE : DisplayDriver::DARK);
+      display.fillRect(tab_x, y, tab_w, _tab_h);
+
+      display.setColor(DisplayDriver::LIGHT);
+      display.drawRect(tab_x, y, tab_w, _tab_h);
+
+      display.setColor(DisplayDriver::LIGHT);
+      // Center the text in the newly available space (no icon)
+      display.drawTextCentered(tab_x + tab_w / 2, y + (_tab_h / 2) - 3, tabLabel(i));
+    }
+  }
+
+  void drawButton(DisplayDriver& display, int x, int y, int w, int h, const char* label, bool active) {
+    if (w < 8 || h < 8) return;
+
+    display.setColor(active ? DisplayDriver::BLUE : DisplayDriver::DARK);
+    display.fillRect(x, y, w, h);
+
+    display.setColor(DisplayDriver::LIGHT);
+    display.drawRect(x, y, w, h);
+
+    display.setColor(DisplayDriver::LIGHT);
+    display.drawTextCentered(x + w / 2, y + (h / 2) - 3, label);
+  }
+
+  void renderMessagesList(DisplayDriver& display) {
+    int x = _content_x;
+    int w = _content_w;
+    int total = _task->getStoredMessageCount();
+    int panel_h = _screen_h - _list_y - 6;
+
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x, _list_y, w, panel_h);
+
+    if (total == 0) {
+      display.setColor(DisplayDriver::LIGHT);
+      display.drawTextCentered(x + w / 2, _list_y + 16, "No messages yet");
+      display.setColor(DisplayDriver::LIGHT);
+      display.drawTextCentered(x + w / 2, _list_y + 30, "Touch tabs to explore");
+      return;
+    }
+
+    if (_msg_cursor >= total) _msg_cursor = total - 1;
+    if (_msg_cursor < 0) _msg_cursor = 0;
+
+    if (_msg_scroll > _msg_cursor) _msg_scroll = _msg_cursor;
+    if (_msg_cursor >= _msg_scroll + _list_rows) _msg_scroll = _msg_cursor - _list_rows + 1;
+    if (_msg_scroll < 0) _msg_scroll = 0;
+
+    for (int i = 0; i < _list_rows; i++) {
+      int idx = _msg_scroll + i;
+      if (idx >= total) break;
+
+      UITask::MessageEntry e;
+      if (!_task->getStoredMessage(idx, e)) break;
+
+      int y = _list_y + i * _row_h;
+      bool selected = (idx == _msg_cursor);
+      
+      display.setColor(selected ? DisplayDriver::BLUE : DisplayDriver::DARK);
+      display.fillRect(x + 2, y + 1, w - 4, _row_h - 2);
+
+      display.setColor(DisplayDriver::LIGHT);
+      display.drawRect(x + 1, y, w - 2, _row_h - 1);
+
+      char age[8];
+      formatAge(e.timestamp, age, sizeof(age));
+      int age_w = display.getTextWidth(age);
+      int name_w = w - age_w - 12;
+      if (name_w < 10) name_w = 10;
+
+      char filtered_origin[sizeof(e.origin)];
+      char filtered_msg[sizeof(e.text)];
+      display.translateUTF8ToBlocks(filtered_origin, e.origin, sizeof(filtered_origin));
+      display.translateUTF8ToBlocks(filtered_msg, e.text, sizeof(filtered_msg));
+
+      display.setColor(DisplayDriver::LIGHT);
+      display.drawTextEllipsized(x + 6, y + 2, name_w, filtered_origin);
+      display.drawTextRightAlign(x + w - 4, y + 2, age);
+
+      if (_row_h >= 18) {
+        display.drawTextEllipsized(x + 6, y + (_row_h / 2) + 1, w - 12, filtered_msg);
       }
-      sensors_scroll = sensors_nb > UI_RECENT_LIST_SIZE;
-#if AUTO_OFF_MILLIS > 0
-      next_sensors_refresh = millis() + 5000; // refresh sensor values every 5 sec
-#else
-      next_sensors_refresh = millis() + 60000; // refresh sensor values every 1 min
-#endif
+    }
+  }
+
+  void renderMessageDetail(DisplayDriver& display) {
+    int x = _content_x;
+    int w = _content_w;
+    int panel_h = _screen_h - _list_y - 6;
+    UITask::MessageEntry e;
+    if (!_task->getStoredMessage(_msg_cursor, e)) {
+      _show_msg_detail = false;
+      return;
+    }
+
+    char age[8];
+    formatAge(e.timestamp, age, sizeof(age));
+
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x, _list_y, w, panel_h);
+
+    // back button
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x + 4, _list_y + 4, 70, 16);
+    display.setColor(DisplayDriver::LIGHT);
+    display.drawRect(x + 4, _list_y + 4, 70, 16);
+    display.drawTextCentered(x + 39, _list_y + 9, "< Back");
+    display.drawTextRightAlign(x + w - 4, _list_y + 9, age);
+
+    char filtered_origin[sizeof(e.origin)];
+    char filtered_msg[sizeof(e.text)];
+    display.translateUTF8ToBlocks(filtered_origin, e.origin, sizeof(filtered_origin));
+    display.translateUTF8ToBlocks(filtered_msg, e.text, sizeof(filtered_msg));
+
+    display.setColor(DisplayDriver::LIGHT);
+    display.drawTextEllipsized(x + 4, _list_y + 26, w - 8, filtered_origin);
+
+    int box_y = _list_y + 42;
+    int box_h = _screen_h - box_y - 6;
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x + 2, box_y + 1, w - 4, box_h - 2);
+
+    display.setColor(DisplayDriver::LIGHT);
+    display.setCursor(x + 5, box_y + 4);
+    display.printWordWrap(filtered_msg, w - 10);
+  }
+
+  void renderNearby(DisplayDriver& display) {
+    int x = _content_x;
+    int w = _content_w;
+    int panel_h = _screen_h - _list_y - 6;
+
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x, _list_y, w, panel_h);
+
+    the_mesh.getRecentlyHeard(recent, UI_RECENT_LIST_SIZE);
+    int shown = 0;
+    for (int i = 0; i < UI_RECENT_LIST_SIZE && shown < _list_rows; i++) {
+      AdvertPath* a = &recent[i];
+      if (a->name[0] == 0) continue;
+      int y = _list_y + shown * _row_h;
+      shown++;
+
+      char age[8];
+      formatAge(a->recv_timestamp, age, sizeof(age));
+      int age_w = display.getTextWidth(age);
+      int max_name_w = w - age_w - 12;
+      if (max_name_w < 8) max_name_w = 8;
+
+      char filtered_name[sizeof(a->name)];
+      display.translateUTF8ToBlocks(filtered_name, a->name, sizeof(filtered_name));
+
+      display.setColor(DisplayDriver::DARK);
+      display.fillRect(x + 2, y + 1, w - 4, _row_h - 2);
+
+      display.setColor(DisplayDriver::LIGHT);
+      display.drawRect(x + 1, y, w - 2, _row_h - 1);
+      display.setColor(DisplayDriver::LIGHT);
+      display.drawRect(x + 1, y, w - 2, _row_h - 1);
+      display.drawTextEllipsized(x + 6, y + 4, max_name_w, filtered_name);
+      display.drawTextRightAlign(x + w - 4, y + 4, age);
+    }
+
+    if (shown == 0) {
+      display.setColor(DisplayDriver::LIGHT);
+      display.drawTextCentered(x + w / 2, _list_y + 16, "No nearby nodes");
+    }
+  }
+
+  void renderRadio(DisplayDriver& display) {
+    int x = _content_x;
+    int w = _content_w;
+    int panel_h = _screen_h - _list_y - 6;
+
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x, _list_y, w, panel_h);
+
+    int left_btn_x = x + 6;
+    int right_btn_x = left_btn_x + _radio_toggle_w + 8;
+    drawButton(display, left_btn_x, _radio_toggle_y, _radio_toggle_w, _radio_toggle_h, "Config", !_radio_raw_mode);
+    drawButton(display, right_btn_x, _radio_toggle_y, _radio_toggle_w, _radio_toggle_h, "Raw", _radio_raw_mode);
+
+    int y = _radio_toggle_y + _radio_toggle_h + 8;
+    char tmp[64];
+
+    if (!_radio_raw_mode) {
+      display.setColor(DisplayDriver::LIGHT);
+      snprintf(tmp, sizeof(tmp), "Freq: %.3f MHz", _node_prefs->freq);
+      display.drawTextLeftAlign(x + 6, y, tmp);
+      y += 13;
+      snprintf(tmp, sizeof(tmp), "SF: %d   CR: %d", _node_prefs->sf, _node_prefs->cr);
+      display.drawTextLeftAlign(x + 6, y, tmp);
+      y += 13;
+      snprintf(tmp, sizeof(tmp), "BW: %.2f kHz", _node_prefs->bw);
+      display.drawTextLeftAlign(x + 6, y, tmp);
+      y += 13;
+      snprintf(tmp, sizeof(tmp), "TX Power: %ddBm", _node_prefs->tx_power_dbm);
+      display.drawTextLeftAlign(x + 6, y, tmp);
+      y += 13;
+      snprintf(tmp, sizeof(tmp), "Noise Floor: %d", radio_driver.getNoiseFloor());
+      display.drawTextLeftAlign(x + 6, y, tmp);
+      y += 16;
+      display.drawTextLeftAlign(x + 6, y, "Tap Raw for TX/RX diagnostics");
+      return;
+    }
+
+    display.setColor(DisplayDriver::LIGHT);
+    snprintf(tmp, sizeof(tmp), "RSSI: %.1f dBm", radio_driver.getLastRSSI());
+    display.drawTextLeftAlign(x + 6, y, tmp);
+    y += 12;
+    snprintf(tmp, sizeof(tmp), "SNR:  %.2f dB", radio_driver.getLastSNR());
+    display.drawTextLeftAlign(x + 6, y, tmp);
+    y += 12;
+    snprintf(tmp, sizeof(tmp), "Noise Floor: %d", radio_driver.getNoiseFloor());
+    display.drawTextLeftAlign(x + 6, y, tmp);
+    y += 12;
+    snprintf(tmp, sizeof(tmp), "Pkts RX/TX: %lu / %lu",
+             (unsigned long)radio_driver.getPacketsRecv(),
+             (unsigned long)radio_driver.getPacketsSent());
+    display.drawTextLeftAlign(x + 6, y, tmp);
+    y += 12;
+    snprintf(tmp, sizeof(tmp), "Flood TX/RX: %lu / %lu",
+             (unsigned long)the_mesh.getNumSentFlood(),
+             (unsigned long)the_mesh.getNumRecvFlood());
+    display.drawTextLeftAlign(x + 6, y, tmp);
+    y += 12;
+    snprintf(tmp, sizeof(tmp), "Direct TX/RX: %lu / %lu",
+             (unsigned long)the_mesh.getNumSentDirect(),
+             (unsigned long)the_mesh.getNumRecvDirect());
+    display.drawTextLeftAlign(x + 6, y, tmp);
+    y += 12;
+    snprintf(tmp, sizeof(tmp), "Air TX/RX sec: %lu / %lu",
+             (unsigned long)(the_mesh.getTotalAirTime() / 1000),
+             (unsigned long)(the_mesh.getReceiveAirTime() / 1000));
+    display.drawTextLeftAlign(x + 6, y, tmp);
+
+    drawButton(display, x + 8, _radio_reset_y, w - 16, _radio_reset_h, "Reset Radio Stats", false);
+  }
+
+  void renderLink(DisplayDriver& display) {
+    int x = _content_x;
+    int w = _content_w;
+    int panel_h = _screen_h - _list_y - 6;
+
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x, _list_y, w, panel_h);
+
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x + 6, _list_y + 6, w - 12, 18);
+    if (_task->hasConnection()) {
+      display.setColor(DisplayDriver::LIGHT);
+      display.fillRect(x + 7, _list_y + 7, w - 14, 16);
+      display.setColor(DisplayDriver::DARK);
+    } else {
+      display.setColor(DisplayDriver::LIGHT);
+    }
+    display.drawTextCentered(x + w / 2, _list_y + 11, _task->hasConnection() ? "Connected" : "Disconnected");
+
+    char tmp[32];
+    if (the_mesh.getBLEPin() != 0) {
+      snprintf(tmp, sizeof(tmp), "PIN %d", the_mesh.getBLEPin());
+      display.setColor(DisplayDriver::LIGHT);
+      display.drawTextRightAlign(x + w - 8, _list_y + 30, tmp);
+    }
+
+    drawButton(display, x + 8, _link_ble_btn_y, w - 16, _link_btn_h,
+               _task->isSerialEnabled() ? "Disable BLE" : "Enable BLE",
+               _task->isSerialEnabled());
+
+    drawButton(display, x + 8, _link_adv_btn_y, w - 16, _link_btn_h, "Send Advert", false);
+  }
+
+  void renderPower(DisplayDriver& display) {
+    int x = _content_x;
+    int w = _content_w;
+    int panel_h = _screen_h - _list_y - 6;
+
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x, _list_y, w, panel_h);
+
+    char tmp[32];
+    snprintf(tmp, sizeof(tmp), "Battery %umV", _task->getBattMilliVolts());
+    display.setColor(DisplayDriver::LIGHT);
+    display.drawTextLeftAlign(x + 8, _list_y + 8, tmp);
+
+    drawButton(display, x + 8, _power_btn_y, w - 16, _power_btn_h, "", _power_armed);
+
+    if (_power_armed && (int32_t)(_power_armed_until - millis()) > 0) {
+      display.setColor(DisplayDriver::DARK);
+      display.drawTextCentered(x + w / 2, _power_btn_y + (_power_btn_h / 2) - 9, "Tap Again To");
+      display.drawTextCentered(x + w / 2, _power_btn_y + (_power_btn_h / 2) + 3, "Hibernate");
+    } else {
+      _power_armed = false;
+      display.setColor(DisplayDriver::LIGHT);
+      display.drawTextCentered(x + w / 2, _power_btn_y + (_power_btn_h / 2) - 9, "Touch To");
+      display.drawTextCentered(x + w / 2, _power_btn_y + (_power_btn_h / 2) + 3, "Hibernate");
+    }
+  }
+
+  void activateCurrentTab() {
+    if (_tab == TAB_LINK) {
+      if (_task->isSerialEnabled()) _task->disableSerial();
+      else _task->enableSerial();
+      return;
+    }
+    if (_tab == TAB_POWER) {
+      if (_power_armed && (int32_t)(_power_armed_until - millis()) > 0) {
+        _task->shutdown();
+      } else {
+        _power_armed = true;
+        _power_armed_until = millis() + 2000;
+      }
+      return;
+    }
+    if (_tab == TAB_MESSAGES) {
+      int total = _task->getStoredMessageCount();
+      if (total == 0) return;
+      _show_msg_detail = !_show_msg_detail;
+      if (_msg_cursor < 0) _msg_cursor = 0;
+      if (_msg_cursor >= total) _msg_cursor = total - 1;
     }
   }
 
 public:
   HomeScreen(UITask* task, mesh::RTCClock* rtc, SensorManager* sensors, NodePrefs* node_prefs)
-     : _task(task), _rtc(rtc), _sensors(sensors), _node_prefs(node_prefs), _page(0), 
-       _shutdown_init(false), sensors_lpp(200) {  }
-
-  void poll() override {
-    if (_shutdown_init && !_task->isButtonPressed()) {  // must wait for USR button to be released
-      _task->shutdown();
-    }
-  }
+     : _task(task), _rtc(rtc), _sensors(sensors), _node_prefs(node_prefs),
+       _tab(TAB_MESSAGES), _show_msg_detail(false), _msg_cursor(0), _msg_scroll(0), _radio_raw_mode(false),
+       _power_armed(false), _power_armed_until(0) { }
 
   int render(DisplayDriver& display) override {
-    char tmp[80];
-    // node name
+    updateLayout(display);
     display.setTextSize(1);
-    display.setColor(DisplayDriver::GREEN);
-    char filtered_name[sizeof(_node_prefs->node_name)];
-    display.translateUTF8ToBlocks(filtered_name, _node_prefs->node_name, sizeof(filtered_name));
-    display.setCursor(0, 0);
-    display.print(filtered_name);
 
-    // battery voltage
-    renderBatteryIndicator(display, _task->getBattMilliVolts());
-
-    // curr page indicator
-    int y = 14;
-    int x = display.width() / 2 - 5 * (HomePage::Count-1);
-    for (uint8_t i = 0; i < HomePage::Count; i++, x += 10) {
-      if (i == _page) {
-        display.fillRect(x-1, y-1, 3, 3);
-      } else {
-        display.fillRect(x, y, 1, 1);
-      }
+    if (_power_armed && (int32_t)(_power_armed_until - millis()) <= 0) {
+      _power_armed = false;
     }
 
-    if (_page == HomePage::FIRST) {
-      display.setColor(DisplayDriver::YELLOW);
-      display.setTextSize(2);
-      sprintf(tmp, "MSG: %d", _task->getMsgCount());
-      display.drawTextCentered(display.width() / 2, 20, tmp);
+    const char* title = "Messages";
+    if (_tab == TAB_NEARBY) title = "Nearby";
+    else if (_tab == TAB_RADIO) title = _radio_raw_mode ? "Radio Raw" : "Radio";
+    else if (_tab == TAB_LINK) title = "Link";
+    else if (_tab == TAB_POWER) title = "Power";
 
-      #ifdef WIFI_SSID
-        IPAddress ip = WiFi.localIP();
-        snprintf(tmp, sizeof(tmp), "IP: %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-        display.setTextSize(1);
-        display.drawTextCentered(display.width() / 2, 54, tmp); 
-      #endif
-      if (_task->hasConnection()) {
-        display.setColor(DisplayDriver::GREEN);
-        display.setTextSize(1);
-        display.drawTextCentered(display.width() / 2, 43, "< Connected >");
+    drawChrome(display, title);
+    drawTabRail(display);
 
-      } else if (the_mesh.getBLEPin() != 0) { // BT pin
-        display.setColor(DisplayDriver::RED);
-        display.setTextSize(2);
-        sprintf(tmp, "Pin:%d", the_mesh.getBLEPin());
-        display.drawTextCentered(display.width() / 2, 43, tmp);
-      }
-    } else if (_page == HomePage::RECENT) {
-      the_mesh.getRecentlyHeard(recent, UI_RECENT_LIST_SIZE);
-      display.setColor(DisplayDriver::GREEN);
-      int y = 20;
-      for (int i = 0; i < UI_RECENT_LIST_SIZE; i++, y += 11) {
-        auto a = &recent[i];
-        if (a->name[0] == 0) continue;  // empty slot
-        int secs = _rtc->getCurrentTime() - a->recv_timestamp;
-        if (secs < 60) {
-          sprintf(tmp, "%ds", secs);
-        } else if (secs < 60*60) {
-          sprintf(tmp, "%dm", secs / 60);
-        } else {
-          sprintf(tmp, "%dh", secs / (60*60));
-        }
-        
-        int timestamp_width = display.getTextWidth(tmp);
-        int max_name_width = display.width() - timestamp_width - 1;
-        
-        char filtered_recent_name[sizeof(a->name)];
-        display.translateUTF8ToBlocks(filtered_recent_name, a->name, sizeof(filtered_recent_name));
-        display.drawTextEllipsized(0, y, max_name_width, filtered_recent_name);
-        display.setCursor(display.width() - timestamp_width - 1, y);
-        display.print(tmp);
-      }
-    } else if (_page == HomePage::RADIO) {
-      display.setColor(DisplayDriver::YELLOW);
-      display.setTextSize(1);
-      // freq / sf
-      display.setCursor(0, 20);
-      sprintf(tmp, "FQ: %06.3f   SF: %d", _node_prefs->freq, _node_prefs->sf);
-      display.print(tmp);
-
-      display.setCursor(0, 31);
-      sprintf(tmp, "BW: %03.2f     CR: %d", _node_prefs->bw, _node_prefs->cr);
-      display.print(tmp);
-
-      // tx power,  noise floor
-      display.setCursor(0, 42);
-      sprintf(tmp, "TX: %ddBm", _node_prefs->tx_power_dbm);
-      display.print(tmp);
-      display.setCursor(0, 53);
-      sprintf(tmp, "Noise floor: %d", radio_driver.getNoiseFloor());
-      display.print(tmp);
-    } else if (_page == HomePage::BLUETOOTH) {
-      display.setColor(DisplayDriver::GREEN);
-      display.drawXbm((display.width() - 32) / 2, 18,
-          _task->isSerialEnabled() ? bluetooth_on : bluetooth_off,
-          32, 32);
-      display.setTextSize(1);
-      display.drawTextCentered(display.width() / 2, 64 - 11, "toggle: " PRESS_LABEL);
-    } else if (_page == HomePage::ADVERT) {
-      display.setColor(DisplayDriver::GREEN);
-      display.drawXbm((display.width() - 32) / 2, 18, advert_icon, 32, 32);
-      display.drawTextCentered(display.width() / 2, 64 - 11, "advert: " PRESS_LABEL);
-#if ENV_INCLUDE_GPS == 1
-    } else if (_page == HomePage::GPS) {
-      LocationProvider* nmea = sensors.getLocationProvider();
-      char buf[50];
-      int y = 18;
-      bool gps_state = _task->getGPSState();
-#ifdef PIN_GPS_SWITCH
-      bool hw_gps_state = digitalRead(PIN_GPS_SWITCH);
-      if (gps_state != hw_gps_state) {
-        strcpy(buf, gps_state ? "gps off(hw)" : "gps off(sw)");
-      } else {
-        strcpy(buf, gps_state ? "gps on" : "gps off");
-      }
-#else
-      strcpy(buf, gps_state ? "gps on" : "gps off");
-#endif
-      display.drawTextLeftAlign(0, y, buf);
-      if (nmea == NULL) {
-        y = y + 12;
-        display.drawTextLeftAlign(0, y, "Can't access GPS");
-      } else {
-        strcpy(buf, nmea->isValid()?"fix":"no fix");
-        display.drawTextRightAlign(display.width()-1, y, buf);
-        y = y + 12;
-        display.drawTextLeftAlign(0, y, "sat");
-        sprintf(buf, "%d", nmea->satellitesCount());
-        display.drawTextRightAlign(display.width()-1, y, buf);
-        y = y + 12;
-        display.drawTextLeftAlign(0, y, "pos");
-        sprintf(buf, "%.4f %.4f", 
-          nmea->getLatitude()/1000000., nmea->getLongitude()/1000000.);
-        display.drawTextRightAlign(display.width()-1, y, buf);
-        y = y + 12;
-        display.drawTextLeftAlign(0, y, "alt");
-        sprintf(buf, "%.2f", nmea->getAltitude()/1000.);
-        display.drawTextRightAlign(display.width()-1, y, buf);
-        y = y + 12;
-      }
-#endif
-#if UI_SENSORS_PAGE == 1
-    } else if (_page == HomePage::SENSORS) {
-      int y = 18;
-      refresh_sensors();
-      char buf[30];
-      char name[30];
-      LPPReader r(sensors_lpp.getBuffer(), sensors_lpp.getSize());
-
-      for (int i = 0; i < sensors_scroll_offset; i++) {
-        uint8_t channel, type;
-        r.readHeader(channel, type);
-        r.skipData(type);
-      }
-
-      for (int i = 0; i < (sensors_scroll?UI_RECENT_LIST_SIZE:sensors_nb); i++) {
-        uint8_t channel, type;
-        if (!r.readHeader(channel, type)) { // reached end, reset
-          r.reset();
-          r.readHeader(channel, type);
-        }
-
-        display.setCursor(0, y);
-        float v;
-        switch (type) {
-          case LPP_GPS: // GPS
-            float lat, lon, alt;
-            r.readGPS(lat, lon, alt);
-            strcpy(name, "gps"); sprintf(buf, "%.4f %.4f", lat, lon);
-            break;
-          case LPP_VOLTAGE:
-            r.readVoltage(v);
-            strcpy(name, "voltage"); sprintf(buf, "%6.2f", v);
-            break;
-          case LPP_CURRENT:
-            r.readCurrent(v);
-            strcpy(name, "current"); sprintf(buf, "%.3f", v);
-            break;
-          case LPP_TEMPERATURE:
-            r.readTemperature(v);
-            strcpy(name, "temperature"); sprintf(buf, "%.2f", v);
-            break;
-          case LPP_RELATIVE_HUMIDITY:
-            r.readRelativeHumidity(v);
-            strcpy(name, "humidity"); sprintf(buf, "%.2f", v);
-            break;
-          case LPP_BAROMETRIC_PRESSURE:
-            r.readPressure(v);
-            strcpy(name, "pressure"); sprintf(buf, "%.2f", v);
-            break;
-          case LPP_ALTITUDE:
-            r.readAltitude(v);
-            strcpy(name, "altitude"); sprintf(buf, "%.0f", v);
-            break;
-          case LPP_POWER:
-            r.readPower(v);
-            strcpy(name, "power"); sprintf(buf, "%6.2f", v);
-            break;
-          default:
-            r.skipData(type);
-            strcpy(name, "unk"); sprintf(buf, "");
-        }
-        display.setCursor(0, y);
-        display.print(name);
-        display.setCursor(
-          display.width()-display.getTextWidth(buf)-1, y
-        );
-        display.print(buf);
-        y = y + 12;
-      }
-      if (sensors_scroll) sensors_scroll_offset = (sensors_scroll_offset+1)%sensors_nb;
-      else sensors_scroll_offset = 0;
-#endif
-    } else if (_page == HomePage::SHUTDOWN) {
-      display.setColor(DisplayDriver::GREEN);
-      display.setTextSize(1);
-      if (_shutdown_init) {
-        display.drawTextCentered(display.width() / 2, 34, "hibernating...");
-      } else {
-        display.drawXbm((display.width() - 32) / 2, 18, power_icon, 32, 32);
-        display.drawTextCentered(display.width() / 2, 64 - 11, "hibernate:" PRESS_LABEL);
-      }
+    if (_tab == TAB_MESSAGES) {
+      if (_show_msg_detail) renderMessageDetail(display);
+      else renderMessagesList(display);
+    } else if (_tab == TAB_NEARBY) {
+      renderNearby(display);
+    } else if (_tab == TAB_RADIO) {
+      renderRadio(display);
+    } else if (_tab == TAB_LINK) {
+      renderLink(display);
+    } else if (_tab == TAB_POWER) {
+      renderPower(display);
     }
-    return 5000;   // next render after 5000 ms
+
+    return 0;
   }
 
   bool handleInput(char c) override {
     if (c == KEY_LEFT || c == KEY_PREV) {
-      _page = (_page + HomePage::Count - 1) % HomePage::Count;
+      _tab = (_tab + TAB_COUNT - 1) % TAB_COUNT;
+      _show_msg_detail = false;
       return true;
     }
     if (c == KEY_NEXT || c == KEY_RIGHT) {
-      _page = (_page + 1) % HomePage::Count;
-      if (_page == HomePage::RECENT) {
-        _task->showAlert("Recent adverts", 800);
+      _tab = (_tab + 1) % TAB_COUNT;
+      _show_msg_detail = false;
+      return true;
+    }
+
+    if (_tab == TAB_MESSAGES) {
+      int total = _task->getStoredMessageCount();
+      if (c == KEY_DOWN && !_show_msg_detail && total > 0) {
+        _msg_cursor++;
+        if (_msg_cursor >= total) _msg_cursor = total - 1;
+        return true;
+      }
+      if (c == KEY_UP && !_show_msg_detail && total > 0) {
+        _msg_cursor--;
+        if (_msg_cursor < 0) _msg_cursor = 0;
+        return true;
+      }
+      if (c == KEY_ENTER) {
+        activateCurrentTab();
+        return true;
+      }
+    }
+
+    if (_tab == TAB_RADIO && c == KEY_ENTER) {
+      _radio_raw_mode = !_radio_raw_mode;
+      return true;
+    }
+
+    if (_tab == TAB_LINK && c == KEY_ENTER) {
+      activateCurrentTab();
+      return true;
+    }
+
+    if (_tab == TAB_POWER && c == KEY_ENTER) {
+      activateCurrentTab();
+      return true;
+    }
+
+    return false;
+  }
+
+  bool handleTouch(int x, int y) override {
+    if (x < _rail_w) {
+      for (int tab = 0; tab < TAB_COUNT; tab++) {
+        if (isInRect(x, y, 0, tabY(tab), _rail_w, _tab_h)) {
+          _tab = tab;
+          _show_msg_detail = false;
+          return true;
+        }
+      }
+    }
+
+    if (_tab == TAB_MESSAGES) {
+      if (_show_msg_detail) {
+        if (isInRect(x, y, _content_x + 4, _list_y + 4, 70, 16)) {
+          _show_msg_detail = false;
+          return true;
+        }
+        return true;
+      }
+
+      int total = _task->getStoredMessageCount();
+      if (total == 0) return true;
+      if (y >= _list_y) {
+        int row = (y - _list_y) / _row_h;
+        if (row >= 0) {
+          int idx = _msg_scroll + row;
+          if (idx >= 0 && idx < total) {
+            _msg_cursor = idx;
+            _show_msg_detail = true;
+            return true;
+          }
+        }
       }
       return true;
     }
-    if (c == KEY_ENTER && _page == HomePage::BLUETOOTH) {
-      if (_task->isSerialEnabled()) {  // toggle Bluetooth on/off
-        _task->disableSerial();
+
+    if (_tab == TAB_RADIO) {
+      int left_btn_x = _content_x + 6;
+      int right_btn_x = left_btn_x + _radio_toggle_w + 8;
+      if (isInRect(x, y, left_btn_x, _radio_toggle_y, _radio_toggle_w, _radio_toggle_h)) {
+        _radio_raw_mode = false;
+        return true;
+      }
+      if (isInRect(x, y, right_btn_x, _radio_toggle_y, _radio_toggle_w, _radio_toggle_h)) {
+        _radio_raw_mode = true;
+        return true;
+      }
+      if (_radio_raw_mode && isInRect(x, y, _content_x + 8, _radio_reset_y, _content_w - 16, _radio_reset_h)) {
+        radio_driver.resetStats();
+        the_mesh.resetStats();
+        _task->showAlert("Radio stats reset", 900);
+        return true;
+      }
+      return true;
+    }
+
+    if (_tab == TAB_LINK) {
+      if (isInRect(x, y, _content_x + 8, _link_ble_btn_y, _content_w - 16, _link_btn_h)) {
+        if (_task->isSerialEnabled()) {
+          _task->disableSerial();
+        } else {
+          _task->enableSerial();
+        }
+        return true;
+      }
+      if (isInRect(x, y, _content_x + 8, _link_adv_btn_y, _content_w - 16, _link_btn_h)) {
+        _task->notify(UIEventType::ack);
+        if (the_mesh.advert()) {
+          _task->showAlert("Advert sent!", 1000);
+        } else {
+          _task->showAlert("Advert failed..", 1000);
+        }
+        return true;
+      }
+    }
+
+    if (_tab == TAB_POWER) {
+      if (!isInRect(x, y, _content_x + 8, _power_btn_y, _content_w - 16, _power_btn_h)) {
+        return true;
+      }
+      if (_power_armed && (int32_t)(_power_armed_until - millis()) > 0) {
+        _task->shutdown();
       } else {
-        _task->enableSerial();
+        _power_armed = true;
+        _power_armed_until = millis() + 2000;
       }
       return true;
     }
-    if (c == KEY_ENTER && _page == HomePage::ADVERT) {
-      _task->notify(UIEventType::ack);
-      if (the_mesh.advert()) {
-        _task->showAlert("Advert sent!", 1000);
-      } else {
-        _task->showAlert("Advert failed..", 1000);
-      }
-      return true;
-    }
-#if ENV_INCLUDE_GPS == 1
-    if (c == KEY_ENTER && _page == HomePage::GPS) {
-      _task->toggleGPS();
-      return true;
-    }
-#endif
-#if UI_SENSORS_PAGE == 1
-    if (c == KEY_ENTER && _page == HomePage::SENSORS) {
-      _task->toggleGPS();
-      next_sensors_refresh=0;
-      return true;
-    }
-#endif
-    if (c == KEY_ENTER && _page == HomePage::SHUTDOWN) {
-      _shutdown_init = true;  // need to wait for button to be released
-      return true;
-    }
+
     return false;
   }
 };
@@ -488,9 +909,11 @@ public:
 
   int render(DisplayDriver& display) override {
     char tmp[16];
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(0, 0, display.width(), display.height());
     display.setCursor(0, 0);
     display.setTextSize(1);
-    display.setColor(DisplayDriver::GREEN);
+    display.setColor(DisplayDriver::LIGHT);
     sprintf(tmp, "Unread: %d", num_unread);
     display.print(tmp);
 
@@ -510,7 +933,7 @@ public:
     display.drawRect(0, 11, display.width(), 1);  // horiz line
 
     display.setCursor(0, 14);
-    display.setColor(DisplayDriver::YELLOW);
+    display.setColor(DisplayDriver::LIGHT);
     char filtered_origin[sizeof(p->origin)];
     display.translateUTF8ToBlocks(filtered_origin, p->origin, sizeof(filtered_origin));
     display.print(filtered_origin);
@@ -521,11 +944,7 @@ public:
     display.translateUTF8ToBlocks(filtered_msg, p->msg, sizeof(filtered_msg));
     display.printWordWrap(filtered_msg, display.width());
 
-#if AUTO_OFF_MILLIS==0 // probably e-ink
-    return 10000; // 10 s
-#else
-    return 1000;  // next render after 1000 ms
-#endif
+    return 0;
   }
 
   bool handleInput(char c) override {
@@ -556,6 +975,15 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
 #endif
 #if defined(PIN_USER_BTN_ANA)
   analog_btn.begin();
+#endif
+
+#if defined(TOUCH_CS) && defined(TOUCH_IRQ) && defined(TOUCH_SPI_SCK) && defined(TOUCH_SPI_MOSI) && defined(TOUCH_SPI_MISO)
+  pinMode(TOUCH_IRQ, INPUT_PULLUP);
+  xpt2046_spi.begin(TOUCH_SPI_SCK, TOUCH_SPI_MISO, TOUCH_SPI_MOSI, TOUCH_CS);
+  xpt2046_ready = xpt2046.begin(xpt2046_spi);
+  if (xpt2046_ready) {
+    xpt2046.setRotation(TOUCH_ROTATION);
+  }
 #endif
 
   _node_prefs = node_prefs;
@@ -628,6 +1056,32 @@ switch(t){
 #endif
 }
 
+void UITask::storeMessage(uint8_t path_len, const char* from_name, const char* text) {
+  _messages_head = (_messages_head + 1) % MAX_STORED_MESSAGES;
+  if (_messages_count < MAX_STORED_MESSAGES) {
+    _messages_count++;
+  }
+
+  MessageEntry* entry = &_messages[_messages_head];
+  entry->timestamp = rtc_clock.getCurrentTime();
+  if (path_len == 0xFF) {
+    snprintf(entry->origin, sizeof(entry->origin), "(D) %s", from_name);
+  } else {
+    snprintf(entry->origin, sizeof(entry->origin), "(%u) %s", (unsigned)path_len, from_name);
+  }
+  StrHelper::strncpy(entry->text, text, sizeof(entry->text));
+}
+
+bool UITask::getStoredMessage(int newest_index, MessageEntry& out) const {
+  if (_messages_count <= 0 || _messages_head < 0) return false;
+  if (newest_index < 0 || newest_index >= _messages_count) return false;
+
+  int idx = _messages_head - newest_index;
+  while (idx < 0) idx += MAX_STORED_MESSAGES;
+  out = _messages[idx];
+  return true;
+}
+
 
 void UITask::msgRead(int msgcount) {
   _msgcount = msgcount;
@@ -639,8 +1093,9 @@ void UITask::msgRead(int msgcount) {
 void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount) {
   _msgcount = msgcount;
 
-  ((MsgPreviewScreen *) msg_preview)->addPreview(path_len, from_name, text);
-  setCurrScreen(msg_preview);
+  storeMessage(path_len, from_name, text);
+  setCurrScreen(home);
+  showAlert("New message", 700);
 
   if (_display != NULL) {
     if (!_display->isOn() && !hasConnection()) {
@@ -648,7 +1103,7 @@ void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, i
     }
     if (_display->isOn()) {
     _auto_off = millis() + AUTO_OFF_MILLIS;  // extend the auto-off timer
-    _next_refresh = 100;  // trigger refresh
+    _next_refresh = 0;  // trigger refresh
     }
   }
 }
@@ -676,7 +1131,10 @@ void UITask::userLedHandler() {
 
 void UITask::setCurrScreen(UIScreen* c) {
   curr = c;
-  _next_refresh = 100;
+  if (_display != NULL && _display->isOn()) {
+    _display->clear();
+  }
+  _next_refresh = 0;
 }
 
 /*
@@ -766,6 +1224,34 @@ void UITask::loop() {
     _analogue_pin_read_millis = millis();
   }
 #endif
+#if defined(TOUCH_CS) && defined(TOUCH_IRQ) && defined(TOUCH_SPI_SCK) && defined(TOUCH_SPI_MOSI) && defined(TOUCH_SPI_MISO)
+  if (c == 0 && xpt2046_ready) {
+    bool is_down = xpt2046.touched();
+    if (is_down) {
+      TS_Point p = xpt2046.getPoint();
+      updateTouchDot(_display, p.x, p.y);
+      if (_display != NULL && _display->isOn()) {
+        _next_refresh = 0;
+      }
+      if (!xpt2046_was_down && (millis() - xpt2046_last_tap_millis) > 90) {
+        int tx = 0, ty = 0;
+        mapRawTouchToDisplay(_display, p.x, p.y, &tx, &ty);
+        bool touch_consumed = false;
+        if (_display != NULL && _display->isOn() && curr != NULL) {
+          touch_consumed = curr->handleTouch(tx, ty);
+        }
+        if (touch_consumed) {
+          _auto_off = millis() + AUTO_OFF_MILLIS;
+          _next_refresh = 0;
+        } else {
+          c = checkDisplayOn(mapXpt2046TouchToKey(_display, p.x, p.y));
+        }
+        xpt2046_last_tap_millis = millis();
+      }
+    }
+    xpt2046_was_down = is_down;
+  }
+#endif
 #if defined(BACKLIGHT_BTN)
   if (millis() > next_backlight_btn_check) {
     bool touch_state = digitalRead(PIN_BUTTON2);
@@ -781,7 +1267,7 @@ void UITask::loop() {
   if (c != 0 && curr) {
     curr->handleInput(c);
     _auto_off = millis() + AUTO_OFF_MILLIS;   // extend auto-off timer
-    _next_refresh = 100;  // trigger refresh
+    _next_refresh = 0;  // trigger refresh
   }
 
   userLedHandler();
@@ -807,8 +1293,15 @@ void UITask::loop() {
         _display->drawTextCentered(_display->width() / 2, y + p*3, _alert);
         _next_refresh = _alert_expiry;   // will need refresh when alert is dismissed
       } else {
-        _next_refresh = millis() + delay_millis;
+        if (delay_millis <= 0) {
+          _next_refresh = 0xFFFFFFFFUL;  // event-driven: no periodic redraw
+        } else {
+          _next_refresh = millis() + (uint32_t)delay_millis;
+        }
       }
+#if defined(TOUCH_CS) && defined(TOUCH_IRQ) && defined(TOUCH_SPI_SCK) && defined(TOUCH_SPI_MOSI) && defined(TOUCH_SPI_MISO)
+      drawTouchDebugDot(*_display);
+#endif
       _display->endFrame();
     }
 #if AUTO_OFF_MILLIS > 0
@@ -833,7 +1326,7 @@ void UITask::loop() {
       if (_display != NULL) {
         _display->startFrame();
         _display->setTextSize(2);
-        _display->setColor(DisplayDriver::RED);
+        _display->setColor(DisplayDriver::LIGHT);
         _display->drawTextCentered(_display->width() / 2, 20, "Low Battery.");
         _display->drawTextCentered(_display->width() / 2, 40, "Shutting Down!");
         _display->endFrame();

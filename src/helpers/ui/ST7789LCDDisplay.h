@@ -7,6 +7,14 @@
 #include <Adafruit_ST7789.h>
 #include <helpers/RefCountedDigitalPin.h>
 
+#ifndef DISPLAY_LOGICAL_WIDTH
+  #define DISPLAY_LOGICAL_WIDTH 128
+#endif
+
+#ifndef DISPLAY_LOGICAL_HEIGHT
+  #define DISPLAY_LOGICAL_HEIGHT 64
+#endif
+
 class ST7789LCDDisplay : public DisplayDriver {
   #if defined(LILYGO_TDECK) || defined(HELTEC_LORA_V4_TFT)
     SPIClass displaySPI;
@@ -19,14 +27,14 @@ class ST7789LCDDisplay : public DisplayDriver {
   bool i2c_probe(TwoWire& wire, uint8_t addr);
 public:
 #ifdef USE_PIN_TFT
-  ST7789LCDDisplay(RefCountedDigitalPin* peripher_power=NULL) : DisplayDriver(128, 64), 
+  ST7789LCDDisplay(RefCountedDigitalPin* peripher_power=NULL) : DisplayDriver(DISPLAY_LOGICAL_WIDTH, DISPLAY_LOGICAL_HEIGHT), 
       display(PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_SDA, PIN_TFT_SCL, PIN_TFT_RST),
       _peripher_power(peripher_power)
   {
     _isOn = false;
   }
 #elif defined(LILYGO_TDECK) || defined(HELTEC_LORA_V4_TFT)
-  ST7789LCDDisplay(RefCountedDigitalPin* peripher_power=NULL) : DisplayDriver(128, 64),
+  ST7789LCDDisplay(RefCountedDigitalPin* peripher_power=NULL) : DisplayDriver(DISPLAY_LOGICAL_WIDTH, DISPLAY_LOGICAL_HEIGHT),
       displaySPI(HSPI),
       display(&displaySPI, PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_RST),
       _peripher_power(peripher_power)
@@ -34,7 +42,7 @@ public:
     _isOn = false;
   }
 #else
-  ST7789LCDDisplay(RefCountedDigitalPin* peripher_power=NULL) : DisplayDriver(128, 64), 
+  ST7789LCDDisplay(RefCountedDigitalPin* peripher_power=NULL) : DisplayDriver(DISPLAY_LOGICAL_WIDTH, DISPLAY_LOGICAL_HEIGHT), 
       display(&SPI, PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_RST),
       _peripher_power(peripher_power)
   {

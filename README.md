@@ -81,6 +81,33 @@ They can also be managed via LoRa in the mobile app by using the Remote Manageme
 
 MeshCore is designed for devices listed in the [MeshCore Flasher](https://flasher.meshcore.co.uk)
 
+### 💎 Featured Build: Heltec v4 TFT Touch Companion Radio
+
+This build features a custom Dark Mode UI optimized for the ST7789 320x240 TFT with XPT2046 touch support.
+
+#### ⚡ Quick Start
+You can download the pre-compiled binary here:
+- [heltec_v4_tft_touch_companion_radio.bin](./bin/heltec_v4_tft_touch_companion_radio.bin)
+
+#### 🔌 Wiring Diagram (Heltec v4 to ST7789 + XPT2046)
+
+| Component | Function | Heltec v4 Pin |
+|-----------|----------|---------------|
+| **TFT**   | SCLK     | GPIO 17       |
+| **TFT**   | MOSI/SDA | GPIO 33       |
+| **TFT**   | CS       | GPIO 15       |
+| **TFT**   | DC       | GPIO 16       |
+| **TFT**   | RESET    | GPIO 18       |
+| **TFT**   | LED/BL   | GPIO 21       |
+| **Touch** | T_CLK    | GPIO 17       |
+| **Touch** | T_DIN    | GPIO 33       |
+| **Touch** | T_DO     | GPIO 42       |
+| **Touch** | T_CS     | GPIO 3        |
+| **Touch** | T_IRQ    | GPIO 4        |
+
+> [!NOTE]
+> SPI lines (SCLK and MOSI) are shared between the TFT and Touch controller. Ensure common grounds and appropriate power (VEXT/3.3V) are connected.
+
 ## 📜 License
 
 MeshCore is open-source software released under the MIT License. You are free to use, modify, and distribute it for personal and commercial projects.
