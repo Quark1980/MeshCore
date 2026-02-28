@@ -408,7 +408,7 @@ private:
       if (active) {
           display.setColor(DisplayDriver::BLUE);
       } else if (unread) {
-          display.setColor(DisplayDriver::GREEN);
+          display.setColor(DisplayDriver::DARK_GREEN);
       } else {
           display.setColor(DisplayDriver::DARK);
       }

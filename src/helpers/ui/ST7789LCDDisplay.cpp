@@ -131,6 +131,9 @@ void ST7789LCDDisplay::setColor(Color c) {
     case DisplayDriver::ORANGE : 
       _color = ST77XX_ORANGE;
       break;
+    case DisplayDriver::DARK_GREEN :
+      _color = 0x03E0; // Dark Green (RGB565)
+      break;
     default:
       _color = ST77XX_WHITE;
       break;
