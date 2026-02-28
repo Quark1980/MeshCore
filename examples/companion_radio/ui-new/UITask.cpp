@@ -910,7 +910,7 @@ public:
   HomeScreen(UITask* task, mesh::RTCClock* rtc, SensorManager* sensors, NodePrefs* node_prefs)
      : _task(task), _rtc(rtc), _sensors(sensors), _node_prefs(node_prefs),
        _tab(TAB_MESSAGES), _show_msg_detail(false), _msg_cursor(0), _msg_scroll(0), _nearby_scroll(0),
-       _active_chat_idx(0xFF), _active_chat_is_group(true), _keyboard_visible(false), _kb_shift(0), _chat_scroll(0), _chat_dropdown_open(false),
+       _active_chat_idx(0), _active_chat_is_group(true), _keyboard_visible(false), _kb_shift(0), _chat_scroll(0), _chat_dropdown_open(false),
        _radio_raw_mode(false),
        _power_armed(false), _power_armed_until(0) {
     _chat_draft[0] = 0;

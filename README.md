@@ -11,7 +11,7 @@ This is a specialized fork optimized for the Heltec v4 (ESP32-S3) with a 320x240
 
 #### ⚡ Quick Start
 You can download the pre-compiled binary here:
-- **[Download heltec_v4_tft_touch_companion_radio.bin](./bin/firmware.bin)** (Flash to `0x10000`)
+- **[Download heltec_v4_touch_v1.1.0.bin](./bin/heltec_v4_touch_v1.1.0.bin)** (Flash to `0x10000`)
 
 #### 🔌 Wiring Diagram (Heltec v4 to ST7789 + XPT2046)
 
