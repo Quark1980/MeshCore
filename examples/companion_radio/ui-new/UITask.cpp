@@ -218,6 +218,7 @@ class HomeScreen : public UIScreen {
   bool _show_msg_detail;
   int _msg_cursor;
   int _msg_scroll;
+  int _nearby_scroll;
   bool _power_armed;
   uint32_t _power_armed_until;
   bool _radio_raw_mode;
@@ -236,6 +237,10 @@ class HomeScreen : public UIScreen {
   int _list_y = 44;
   int _row_h = 24;
   int _list_rows = 8;
+
+  int _scroll_btn_w = 28;
+  int _scroll_up_y = 44;
+  int _scroll_down_y = 200;
   int _link_btn_h = 34;
   int _link_ble_btn_y = 94;
   int _link_adv_btn_y = 140;
@@ -282,6 +287,10 @@ class HomeScreen : public UIScreen {
 
     _radio_reset_h = (_screen_h >= 220) ? 24 : 18;
     _radio_reset_y = _screen_h - _radio_reset_h - 8;
+
+    _scroll_btn_w = (_screen_w >= 300) ? 28 : 22;
+    _scroll_up_y = _list_y;
+    _scroll_down_y = _screen_h - _row_h - 6;
   }
 
   int tabY(int idx) const {
@@ -421,6 +430,7 @@ class HomeScreen : public UIScreen {
     if (_msg_cursor >= _msg_scroll + _list_rows) _msg_scroll = _msg_cursor - _list_rows + 1;
     if (_msg_scroll < 0) _msg_scroll = 0;
 
+    int list_w = w - _scroll_btn_w - 4;
     for (int i = 0; i < _list_rows; i++) {
       int idx = _msg_scroll + i;
       if (idx >= total) break;
@@ -432,15 +442,15 @@ class HomeScreen : public UIScreen {
       bool selected = (idx == _msg_cursor);
       
       display.setColor(selected ? DisplayDriver::BLUE : DisplayDriver::DARK);
-      display.fillRect(x + 2, y + 1, w - 4, _row_h - 2);
+      display.fillRect(x + 2, y + 1, list_w - 4, _row_h - 2);
 
       display.setColor(DisplayDriver::LIGHT);
-      display.drawRect(x + 1, y, w - 2, _row_h - 1);
+      display.drawRect(x + 1, y, list_w - 2, _row_h - 1);
 
       char age[8];
       formatAge(e.timestamp, age, sizeof(age));
       int age_w = display.getTextWidth(age);
-      int name_w = w - age_w - 12;
+      int name_w = list_w - age_w - 12;
       if (name_w < 10) name_w = 10;
 
       char filtered_origin[sizeof(e.origin)];
@@ -450,12 +460,17 @@ class HomeScreen : public UIScreen {
 
       display.setColor(DisplayDriver::LIGHT);
       display.drawTextEllipsized(x + 6, y + 2, name_w, filtered_origin);
-      display.drawTextRightAlign(x + w - 4, y + 2, age);
+      display.drawTextRightAlign(x + list_w - 4, y + 2, age);
 
       if (_row_h >= 18) {
-        display.drawTextEllipsized(x + 6, y + (_row_h / 2) + 1, w - 12, filtered_msg);
+        display.drawTextEllipsized(x + 6, y + (_row_h / 2) + 1, list_w - 12, filtered_msg);
       }
     }
+
+    // scroll buttons
+    int btn_x = x + w - _scroll_btn_w;
+    drawButton(display, btn_x, _scroll_up_y, _scroll_btn_w, _row_h, "^", false);
+    drawButton(display, btn_x, _scroll_down_y, _scroll_btn_w, _row_h, "v", false);
   }
 
   void renderMessageDetail(DisplayDriver& display) {
@@ -509,37 +524,58 @@ class HomeScreen : public UIScreen {
     display.fillRect(x, _list_y, w, panel_h);
 
     the_mesh.getRecentlyHeard(recent, UI_RECENT_LIST_SIZE);
+    int total = 0;
+    for (int i = 0; i < UI_RECENT_LIST_SIZE; i++) {
+      if (recent[i].name[0] != 0) total++;
+    }
+
+    if (total == 0) {
+      display.setColor(DisplayDriver::LIGHT);
+      display.drawTextCentered(x + w / 2, _list_y + 16, "No nearby nodes");
+      return;
+    }
+
+    if (_nearby_scroll >= total) _nearby_scroll = total - 1;
+    if (_nearby_scroll < 0) _nearby_scroll = 0;
+
+    int list_w = w - _scroll_btn_w - 4;
     int shown = 0;
+    int skipped = 0;
     for (int i = 0; i < UI_RECENT_LIST_SIZE && shown < _list_rows; i++) {
       AdvertPath* a = &recent[i];
       if (a->name[0] == 0) continue;
+      
+      if (skipped < _nearby_scroll) {
+        skipped++;
+        continue;
+      }
+
       int y = _list_y + shown * _row_h;
       shown++;
 
       char age[8];
       formatAge(a->recv_timestamp, age, sizeof(age));
       int age_w = display.getTextWidth(age);
-      int max_name_w = w - age_w - 12;
+      int max_name_w = list_w - age_w - 12;
       if (max_name_w < 8) max_name_w = 8;
 
       char filtered_name[sizeof(a->name)];
       display.translateUTF8ToBlocks(filtered_name, a->name, sizeof(filtered_name));
 
       display.setColor(DisplayDriver::DARK);
-      display.fillRect(x + 2, y + 1, w - 4, _row_h - 2);
+      display.fillRect(x + 2, y + 1, list_w - 4, _row_h - 2);
 
       display.setColor(DisplayDriver::LIGHT);
-      display.drawRect(x + 1, y, w - 2, _row_h - 1);
+      display.drawRect(x + 1, y, list_w - 2, _row_h - 1);
       display.setColor(DisplayDriver::LIGHT);
-      display.drawRect(x + 1, y, w - 2, _row_h - 1);
       display.drawTextEllipsized(x + 6, y + 4, max_name_w, filtered_name);
-      display.drawTextRightAlign(x + w - 4, y + 4, age);
+      display.drawTextRightAlign(x + list_w - 4, y + 4, age);
     }
 
-    if (shown == 0) {
-      display.setColor(DisplayDriver::LIGHT);
-      display.drawTextCentered(x + w / 2, _list_y + 16, "No nearby nodes");
-    }
+    // scroll buttons
+    int btn_x = x + w - _scroll_btn_w;
+    drawButton(display, btn_x, _scroll_up_y, _scroll_btn_w, _row_h, "^", false);
+    drawButton(display, btn_x, _scroll_down_y, _scroll_btn_w, _row_h, "v", false);
   }
 
   void renderRadio(DisplayDriver& display) {
@@ -699,7 +735,7 @@ class HomeScreen : public UIScreen {
 public:
   HomeScreen(UITask* task, mesh::RTCClock* rtc, SensorManager* sensors, NodePrefs* node_prefs)
      : _task(task), _rtc(rtc), _sensors(sensors), _node_prefs(node_prefs),
-       _tab(TAB_MESSAGES), _show_msg_detail(false), _msg_cursor(0), _msg_scroll(0), _radio_raw_mode(false),
+       _tab(TAB_MESSAGES), _show_msg_detail(false), _msg_cursor(0), _msg_scroll(0), _nearby_scroll(0), _radio_raw_mode(false),
        _power_armed(false), _power_armed_until(0) { }
 
   int render(DisplayDriver& display) override {
@@ -804,17 +840,49 @@ public:
       }
 
       int total = _task->getStoredMessageCount();
-      if (total == 0) return true;
+      int btn_x = _content_x + _content_w - _scroll_btn_w;
+      if (isInRect(x, y, btn_x, _scroll_up_y, _scroll_btn_w, _row_h)) {
+        if (_msg_cursor > 0) _msg_cursor--;
+        return true;
+      }
+      if (isInRect(x, y, btn_x, _scroll_down_y, _scroll_btn_w, _row_h)) {
+        if (_msg_cursor < total - 1) _msg_cursor++;
+        return true;
+      }
+
       if (y >= _list_y) {
         int row = (y - _list_y) / _row_h;
-        if (row >= 0) {
-          int idx = _msg_scroll + row;
-          if (idx >= 0 && idx < total) {
-            _msg_cursor = idx;
-            _show_msg_detail = true;
-            return true;
+        if (row >= 0 && row < _list_rows) {
+          int list_w = _content_w - _scroll_btn_w - 4;
+          if (x < _content_x + list_w) {
+            int idx = _msg_scroll + row;
+            if (idx >= 0 && idx < total) {
+              _msg_cursor = idx;
+              _show_msg_detail = true;
+              return true;
+            }
           }
         }
+      }
+      return true;
+    }
+
+    if (_tab == TAB_NEARBY) {
+      the_mesh.getRecentlyHeard(recent, UI_RECENT_LIST_SIZE);
+      int total = 0;
+      for (int i = 0; i < UI_RECENT_LIST_SIZE; i++) {
+        if (recent[i].name[0] != 0) total++;
+      }
+      if (total == 0) return true;
+
+      int btn_x = _content_x + _content_w - _scroll_btn_w;
+      if (isInRect(x, y, btn_x, _scroll_up_y, _scroll_btn_w, _row_h)) {
+        if (_nearby_scroll > 0) _nearby_scroll--;
+        return true;
+      }
+      if (isInRect(x, y, btn_x, _scroll_down_y, _scroll_btn_w, _row_h)) {
+        if (_nearby_scroll < total - 1) _nearby_scroll++;
+        return true;
       }
       return true;
     }
