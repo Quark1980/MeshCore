@@ -201,28 +201,31 @@ public:
 };
 
 class HomeScreen : public UIScreen {
-  enum Tab {
-    TAB_MESSAGES,
-    TAB_NEARBY,
-    TAB_RADIO,
-    TAB_LINK,
-    TAB_POWER,
-    TAB_COUNT
-  };
+  enum Tab { TAB_MESSAGES, TAB_NEARBY, TAB_CHAT, TAB_RADIO, TAB_LINK, TAB_POWER, TAB_OFFLINE, TAB_RAW, TAB_COUNT };
+  Tab _tab;
+
+  uint8_t _active_chat_idx;
+  bool _active_chat_is_group;
+  char _chat_draft[64];
+  bool _keyboard_visible;
+  int _kb_shift; // 0=lower, 1=upper, 2=symbols/numbers
+  int _chat_scroll; // scroll offset for chat messages
+  bool _chat_dropdown_open;
+  
+  bool _show_msg_detail;
+  int _msg_cursor;
+  int _msg_scroll;
+  int _nearby_scroll;
+  
+  bool _radio_raw_mode;
+  bool _power_armed;
+  uint32_t _power_armed_until;
+  AdvertPath recent[UI_RECENT_LIST_SIZE];
 
   UITask* _task;
   mesh::RTCClock* _rtc;
   SensorManager* _sensors;
   NodePrefs* _node_prefs;
-  uint8_t _tab;
-  bool _show_msg_detail;
-  int _msg_cursor;
-  int _msg_scroll;
-  int _nearby_scroll;
-  bool _power_armed;
-  uint32_t _power_armed_until;
-  bool _radio_raw_mode;
-  AdvertPath recent[UI_RECENT_LIST_SIZE];
 
   // Cached layout (updated every render).
   int _screen_w = 320;
@@ -316,6 +319,7 @@ class HomeScreen : public UIScreen {
     switch (i) {
       case TAB_MESSAGES: return "MSG";
       case TAB_NEARBY: return "NBR";
+      case TAB_CHAT: return "CHT";
       case TAB_RADIO: return "RF";
       case TAB_LINK: return "BLE";
       case TAB_POWER: return "PWR";
@@ -578,6 +582,144 @@ class HomeScreen : public UIScreen {
     drawButton(display, btn_x, _scroll_down_y, _scroll_btn_w, _row_h, "v", false);
   }
 
+  void renderChat(DisplayDriver& display) {
+    int x = _content_x;
+    int w = _content_w;
+    int panel_h = _screen_h - _list_y;
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x, _list_y, w, panel_h);
+
+    // Top: Channel Selector
+    char ch_name[32] = "Select Channel / Contact";
+    if (_active_chat_idx != 0xFF) {
+        if (_active_chat_is_group) {
+            ChannelDetails ch;
+            if (the_mesh.getChannel(_active_chat_idx, ch)) strcpy(ch_name, ch.name);
+        } else {
+            ContactInfo ci;
+            if (the_mesh.getContactByIdx(_active_chat_idx, ci)) strcpy(ch_name, ci.name);
+        }
+    }
+    drawButton(display, x + 4, _list_y + 4, w - 8, 22, ch_name, _chat_dropdown_open);
+
+    // Bottom: Input Field
+    int input_y = _screen_h - 26;
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x + 2, input_y, w - 4, 24);
+    display.setColor(DisplayDriver::LIGHT);
+    display.drawRect(x + 1, input_y - 1, w - 2, 26);
+    if (_chat_draft[0] == 0) {
+        display.setColor(DisplayDriver::GREY);
+        display.drawTextLeftAlign(x + 6, input_y + 4, "Write message...");
+    } else {
+        display.setColor(DisplayDriver::LIGHT);
+        display.drawTextLeftAlign(x + 6, input_y + 4, _chat_draft);
+    }
+
+    // Middle: History (Filtered)
+    int hist_y = _list_y + 30;
+    int hist_h = input_y - hist_y - 4;
+    int rows = hist_h / 14;
+    int shown = 0;
+    for (int i = 0; i < _task->getStoredMessageCount() && shown < rows; i++) {
+        UITask::MessageEntry e;
+        if (!_task->getStoredMessage(i + _chat_scroll, e)) break;
+        
+        bool match = false;
+        if (_active_chat_idx != 0xFF) {
+            if (_active_chat_is_group) {
+                match = e.is_group && (e.channel_idx == _active_chat_idx);
+            } else {
+                // For direct, we'd need pubkey matching, but for now we'll match by channel_idx=0xFF and origin name prefix
+                // This is a simplification for the first version
+                match = !e.is_group && (e.channel_idx == 0xFF);
+            }
+        }
+
+        if (match) {
+            int ry = hist_y + (rows - 1 - shown) * 14;
+            display.setColor(DisplayDriver::BLUE);
+            display.drawTextEllipsized(x + 4, ry, 60, e.origin);
+            display.setColor(DisplayDriver::LIGHT);
+            display.drawTextEllipsized(x + 66, ry, w - 70, e.text);
+            shown++;
+        }
+    }
+
+    if (_keyboard_visible) renderKeyboard(display);
+    if (_chat_dropdown_open) renderChatDropdown(display);
+  }
+
+  void renderKeyboard(DisplayDriver& display) {
+    int kb_h = 100;
+    int kb_y = _screen_h - kb_h;
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(0, kb_y, _screen_w, kb_h);
+    display.setColor(DisplayDriver::LIGHT);
+    display.fillRect(0, kb_y, _screen_w, 1);
+
+    const char* rows[3];
+    if (_kb_shift == 0) {
+        rows[0] = "qwertyuiop";
+        rows[1] = "asdfghjkl";
+        rows[2] = "zxcvbnm";
+    } else if (_kb_shift == 1) {
+        rows[0] = "QWERTYUIOP";
+        rows[1] = "ASDFGHJKL";
+        rows[2] = "ZXCVBNM";
+    } else {
+        rows[0] = "1234567890";
+        rows[1] = "-/()$&@\"";
+        rows[2] = ".,?!'#";
+    }
+
+    int ky = kb_y + 6;
+    int kw = _screen_w / 10;
+    int kh = 22;
+
+    for (int r = 0; r < 3; r++) {
+        int len = strlen(rows[r]);
+        int ox = (_screen_w - (len * kw)) / 2;
+        for (int c = 0; c < len; c++) {
+            char key[2] = { rows[r][c], 0 };
+            drawKey(display, ox + c * kw, ky + r * (kh + 4), kw - 2, kh, key);
+        }
+    }
+
+    // Special keys
+    int bottom_y = ky + 3 * (kh + 4);
+    drawKey(display, 4, bottom_y, 40, kh, _kb_shift == 0 ? "ABC" : "abc");
+    drawKey(display, 50, bottom_y, 140, kh, "SPACE");
+    drawKey(display, 196, bottom_y, 50, kh, "BKSP");
+    drawKey(display, 252, bottom_y, 64, kh, "SEND");
+  }
+
+  void drawKey(DisplayDriver& display, int x, int y, int w, int h, const char* label) {
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x, y, w, h);
+    display.setColor(DisplayDriver::LIGHT);
+    display.drawRect(x, y, w, h);
+    display.drawTextCentered(x + w / 2, y + (h - 12) / 2, label);
+  }
+
+  void renderChatDropdown(DisplayDriver& display) {
+    int dx = _content_x + 10;
+    int dy = _list_y + 26;
+    int dw = _content_w - 20;
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(dx, dy, dw, 120);
+    display.setColor(DisplayDriver::LIGHT);
+    display.drawRect(dx, dy, dw, 120);
+
+    // Static channels for now: Public + any custom
+    for (int i = 0; i < 4; i++) {
+        ChannelDetails ch;
+        if (the_mesh.getChannel(i, ch)) {
+            display.drawTextLeftAlign(dx + 6, dy + 6 + i * 20, ch.name);
+        }
+    }
+  }
+
   void renderRadio(DisplayDriver& display) {
     int x = _content_x;
     int w = _content_w;
@@ -735,8 +877,12 @@ class HomeScreen : public UIScreen {
 public:
   HomeScreen(UITask* task, mesh::RTCClock* rtc, SensorManager* sensors, NodePrefs* node_prefs)
      : _task(task), _rtc(rtc), _sensors(sensors), _node_prefs(node_prefs),
-       _tab(TAB_MESSAGES), _show_msg_detail(false), _msg_cursor(0), _msg_scroll(0), _nearby_scroll(0), _radio_raw_mode(false),
-       _power_armed(false), _power_armed_until(0) { }
+       _tab(TAB_MESSAGES), _show_msg_detail(false), _msg_cursor(0), _msg_scroll(0), _nearby_scroll(0),
+       _active_chat_idx(0xFF), _active_chat_is_group(true), _keyboard_visible(false), _kb_shift(0), _chat_scroll(0), _chat_dropdown_open(false),
+       _radio_raw_mode(false),
+       _power_armed(false), _power_armed_until(0) {
+    _chat_draft[0] = 0;
+  }
 
   int render(DisplayDriver& display) override {
     updateLayout(display);
@@ -748,6 +894,7 @@ public:
 
     const char* title = "Messages";
     if (_tab == TAB_NEARBY) title = "Nearby";
+    else if (_tab == TAB_CHAT) title = "Chat";
     else if (_tab == TAB_RADIO) title = _radio_raw_mode ? "Radio Raw" : "Radio";
     else if (_tab == TAB_LINK) title = "Link";
     else if (_tab == TAB_POWER) title = "Power";
@@ -760,6 +907,8 @@ public:
       else renderMessagesList(display);
     } else if (_tab == TAB_NEARBY) {
       renderNearby(display);
+    } else if (_tab == TAB_CHAT) {
+      renderChat(display);
     } else if (_tab == TAB_RADIO) {
       renderRadio(display);
     } else if (_tab == TAB_LINK) {
@@ -773,12 +922,12 @@ public:
 
   bool handleInput(char c) override {
     if (c == KEY_LEFT || c == KEY_PREV) {
-      _tab = (_tab + TAB_COUNT - 1) % TAB_COUNT;
+      _tab = (Tab)((_tab + TAB_COUNT - 1) % TAB_COUNT);
       _show_msg_detail = false;
       return true;
     }
     if (c == KEY_NEXT || c == KEY_RIGHT) {
-      _tab = (_tab + 1) % TAB_COUNT;
+      _tab = (Tab)((_tab + 1) % TAB_COUNT);
       _show_msg_detail = false;
       return true;
     }
@@ -823,7 +972,7 @@ public:
     if (x < _rail_w) {
       for (int tab = 0; tab < TAB_COUNT; tab++) {
         if (isInRect(x, y, 0, tabY(tab), _rail_w, _tab_h)) {
-          _tab = tab;
+          _tab = (Tab)tab;
           _show_msg_detail = false;
           return true;
         }
@@ -865,6 +1014,44 @@ public:
         }
       }
       return true;
+    }
+
+    if (_tab == TAB_CHAT) {
+        if (_chat_dropdown_open) {
+            int dx = _content_x + 10;
+            int dy = _list_y + 26;
+            int dw = _content_w - 20;
+            if (isInRect(x, y, dx, dy, dw, 120)) {
+                int row = (y - dy - 6) / 20;
+                if (row >= 0 && row < MAX_GROUP_CHANNELS) {
+                    ChannelDetails ch;
+                    if (the_mesh.getChannel(row, ch)) {
+                        _active_chat_idx = row;
+                        _active_chat_is_group = true;
+                    }
+                }
+                _chat_dropdown_open = false;
+                return true;
+            }
+            _chat_dropdown_open = false;
+            return true;
+        }
+
+        if (isInRect(x, y, _content_x + 4, _list_y + 4, _content_w - 8, 22)) {
+            _chat_dropdown_open = true;
+            return true;
+        }
+
+        int input_y = _screen_h - 26;
+        if (isInRect(x, y, _content_x + 1, input_y - 1, _content_w - 2, 26)) {
+            _keyboard_visible = true;
+            return true;
+        }
+
+        if (y > _list_y + 30 && y < input_y) {
+            // Scroll history? (Optional)
+        }
+        return true;
     }
 
     if (_tab == TAB_NEARBY) {
@@ -1119,25 +1306,21 @@ switch(t){
 #ifdef PIN_VIBRATION
   // Trigger vibration for all UI events except none
   if (t != UIEventType::none) {
-    vibration.trigger();
+      vibration.trigger();
   }
 #endif
 }
 
-void UITask::storeMessage(uint8_t path_len, const char* from_name, const char* text) {
+void UITask::storeMessage(uint8_t path_len, const char* from_name, const char* text, uint8_t channel_idx, bool is_group) {
   _messages_head = (_messages_head + 1) % MAX_STORED_MESSAGES;
-  if (_messages_count < MAX_STORED_MESSAGES) {
-    _messages_count++;
-  }
+  if (_messages_count < MAX_STORED_MESSAGES) _messages_count++;
 
-  MessageEntry* entry = &_messages[_messages_head];
-  entry->timestamp = rtc_clock.getCurrentTime();
-  if (path_len == 0xFF) {
-    snprintf(entry->origin, sizeof(entry->origin), "(D) %s", from_name);
-  } else {
-    snprintf(entry->origin, sizeof(entry->origin), "(%u) %s", (unsigned)path_len, from_name);
-  }
-  StrHelper::strncpy(entry->text, text, sizeof(entry->text));
+  MessageEntry& e = _messages[_messages_head];
+  e.timestamp = rtc_clock.getCurrentTime();
+  e.channel_idx = channel_idx;
+  e.is_group = is_group;
+  StrHelper::strzcpy(e.origin, from_name, sizeof(e.origin));
+  StrHelper::strzcpy(e.text, text, sizeof(e.text));
 }
 
 bool UITask::getStoredMessage(int newest_index, MessageEntry& out) const {
@@ -1158,10 +1341,10 @@ void UITask::msgRead(int msgcount) {
   }
 }
 
-void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount) {
+void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount, uint8_t channel_idx, bool is_group) {
   _msgcount = msgcount;
 
-  storeMessage(path_len, from_name, text);
+  storeMessage(path_len, from_name, text, channel_idx, is_group);
   setCurrScreen(home);
   showAlert("New message", 700);
 

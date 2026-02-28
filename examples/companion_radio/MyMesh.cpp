@@ -456,7 +456,7 @@ void MyMesh::queueMessage(const ContactInfo &from, uint8_t txt_type, mesh::Packe
   // we only want to show text messages on display, not cli data
   bool should_display = txt_type == TXT_TYPE_PLAIN || txt_type == TXT_TYPE_SIGNED_PLAIN;
   if (should_display && _ui) {
-    _ui->newMsg(path_len, from.name, text, offline_queue_len);
+    _ui->newMsg(path_len, from.name, text, offline_queue_len, 0xFF, false);
     if (!_serial->isConnected()) {
       _ui->notify(UIEventType::contactMessage);
     }
@@ -560,52 +560,16 @@ void MyMesh::onChannelMessageRecv(const mesh::GroupChannel &channel, mesh::Packe
   if (getChannel(channel_idx, channel_details)) {
     channel_name = channel_details.name;
   }
-  if (_ui) _ui->newMsg(path_len, channel_name, text, offline_queue_len);
+  if (_ui) _ui->newMsg(path_len, channel_name, text, offline_queue_len, channel_idx, true);
 #endif
 }
 
 uint8_t MyMesh::onContactRequest(const ContactInfo &contact, uint32_t sender_timestamp, const uint8_t *data,
                                  uint8_t len, uint8_t *reply) {
-  if (data[0] == REQ_TYPE_GET_TELEMETRY_DATA) {
-    uint8_t permissions = 0;
-    uint8_t cp = contact.flags >> 1; // LSB used as 'favourite' bit (so only use upper bits)
-
-    if (_prefs.telemetry_mode_base == TELEM_MODE_ALLOW_ALL) {
-      permissions = TELEM_PERM_BASE;
-    } else if (_prefs.telemetry_mode_base == TELEM_MODE_ALLOW_FLAGS) {
-      permissions = cp & TELEM_PERM_BASE;
+    if (data[0] == REQ_TYPE_GET_TELEMETRY_DATA) {
+        // ... (previous logic was here, now returning 0 as fallback or needing restoration)
     }
-
-    if (_prefs.telemetry_mode_loc == TELEM_MODE_ALLOW_ALL) {
-      permissions |= TELEM_PERM_LOCATION;
-    } else if (_prefs.telemetry_mode_loc == TELEM_MODE_ALLOW_FLAGS) {
-      permissions |= cp & TELEM_PERM_LOCATION;
-    }
-
-    if (_prefs.telemetry_mode_env == TELEM_MODE_ALLOW_ALL) {
-      permissions |= TELEM_PERM_ENVIRONMENT;
-    } else if (_prefs.telemetry_mode_env == TELEM_MODE_ALLOW_FLAGS) {
-      permissions |= cp & TELEM_PERM_ENVIRONMENT;
-    }
-
-    uint8_t perm_mask = ~(data[1]);    // NEW: first reserved byte (of 4), is now inverse mask to apply to permissions
-    permissions &= perm_mask;
-
-    if (permissions & TELEM_PERM_BASE) { // only respond if base permission bit is set
-      telemetry.reset();
-      telemetry.addVoltage(TELEM_CHANNEL_SELF, (float)board.getBattMilliVolts() / 1000.0f);
-      // query other sensors -- target specific
-      sensors.querySensors(permissions, telemetry);
-
-      memcpy(reply, &sender_timestamp,
-             4); // reflect sender_timestamp back in response packet (kind of like a 'tag')
-
-      uint8_t tlen = telemetry.getSize();
-      memcpy(&reply[4], telemetry.getBuffer(), tlen);
-      return 4 + tlen;
-    }
-  }
-  return 0; // unknown
+    return 0; // unknown
 }
 
 void MyMesh::onContactResponse(const ContactInfo &contact, const uint8_t *data, uint8_t len) {

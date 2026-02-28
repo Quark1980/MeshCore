@@ -28,6 +28,8 @@ public:
     uint32_t timestamp;
     char origin[32];
     char text[96];
+    uint8_t channel_idx;
+    bool is_group;
   };
 
 private:
@@ -67,7 +69,7 @@ private:
   int _messages_count = 0;      // number of valid entries
 
   void userLedHandler();
-  void storeMessage(uint8_t path_len, const char* from_name, const char* text);
+  void storeMessage(uint8_t path_len, const char* from_name, const char* text, uint8_t channel_idx = 0xFF, bool is_group = false);
 
   // Button action handlers
   char checkDisplayOn(char c);
@@ -102,6 +104,8 @@ public:
 #endif
   }
 
+
+
   void toggleBuzzer();
   bool getGPSState();
   void toggleGPS();
@@ -109,7 +113,7 @@ public:
 
   // from AbstractUITask
   void msgRead(int msgcount) override;
-  void newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount) override;
+  void newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount, uint8_t channel_idx = 0xFF, bool is_group = false) override;
   void notify(UIEventType t = UIEventType::none) override;
   void loop() override;
 
