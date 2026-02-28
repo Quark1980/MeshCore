@@ -30,7 +30,14 @@ public:
     char text[96];
     uint8_t channel_idx;
     bool is_group;
+    bool is_sent;     // true if sent from this device
+    uint8_t status;  // 0=pending/none, 1=repeated/acked, 2=failed (optional)
+    uint32_t ack_hash; // to match with incoming acks
   };
+  void start();
+  void userLedHandler();
+  void storeMessage(uint8_t path_len, const char* from_name, const char* text, uint8_t channel_idx = 0xFF, bool is_group = false, bool is_sent = false, uint32_t ack_hash = 0);
+  void updateMessageAck(uint32_t ack_hash);
 
 private:
   static const int MAX_STORED_MESSAGES = 24;
@@ -67,9 +74,6 @@ private:
   MessageEntry _messages[MAX_STORED_MESSAGES];
   int _messages_head = -1;      // newest entry index in ring
   int _messages_count = 0;      // number of valid entries
-
-  void userLedHandler();
-  void storeMessage(uint8_t path_len, const char* from_name, const char* text, uint8_t channel_idx = 0xFF, bool is_group = false);
 
   // Button action handlers
   char checkDisplayOn(char c);

@@ -741,6 +741,21 @@ void MyMesh::onRawDataRecv(mesh::Packet *packet) {
 #endif
 }
 
+void MyMesh::onAckRecv(mesh::Packet* packet, uint32_t ack_crc) {
+    BaseChatMesh::onAckRecv(packet, ack_crc);
+    if (_ui) _ui->updateMessageAck(ack_crc);
+}
+
+void MyMesh::onGroupDataRecv(mesh::Packet* packet, uint8_t type, const mesh::GroupChannel& channel, uint8_t* data, size_t len) {
+    BaseChatMesh::onGroupDataRecv(packet, type, channel, data, len);
+    // For group messages, use some packet bytes as a proxy for repeat detection
+    uint8_t hash[MAX_HASH_SIZE];
+    packet->calculatePacketHash(hash);
+    uint32_t short_hash;
+    memcpy(&short_hash, hash, 4);
+    if (_ui) _ui->updateMessageAck(short_hash);
+}
+
 void MyMesh::onTraceRecv(mesh::Packet *packet, uint32_t tag, uint32_t auth_code, uint8_t flags,
                          const uint8_t *path_snrs, const uint8_t *path_hashes, uint8_t path_len) {
   uint8_t path_sz = flags & 0x03;  // NEW v1.11+

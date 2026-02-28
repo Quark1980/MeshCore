@@ -638,8 +638,13 @@ class HomeScreen : public UIScreen {
 
         if (match) {
             int ry = hist_y + (rows - 1 - shown) * 14;
-            display.setColor(DisplayDriver::BLUE);
-            display.drawTextEllipsized(x + 4, ry, 60, e.origin);
+            if (e.is_sent) {
+                display.setColor(e.status == 1 ? DisplayDriver::GREEN : DisplayDriver::RED);
+                display.drawTextEllipsized(x + 4, ry, 60, " Me"); // Small indicator
+            } else {
+                display.setColor(DisplayDriver::BLUE);
+                display.drawTextEllipsized(x + 4, ry, 60, e.origin);
+            }
             display.setColor(DisplayDriver::LIGHT);
             display.drawTextEllipsized(x + 66, ry, w - 70, e.text);
             shown++;
@@ -1012,18 +1017,24 @@ public:
             if (isInRect(x, y, 250, bottom_y, 65, kh)) {
                 // SEND
                 if (_chat_draft[0] != 0 && _active_chat_idx != 0xFF) {
+                    uint32_t expected_ack = 0;
                     if (_active_chat_is_group) {
                         ChannelDetails ch;
                         if (the_mesh.getChannel(_active_chat_idx, ch)) {
                             the_mesh.sendGroupMessage(_rtc->getCurrentTime(), ch.channel, _node_prefs->node_name, _chat_draft, strlen(_chat_draft));
+                            // Use a simple sum-based checksum for repeat detection
+                            expected_ack = 0;
+                            for (int i = 0; _chat_draft[i]; i++) expected_ack += _chat_draft[i];
                         }
                     } else {
                         ContactInfo ci;
                         if (the_mesh.getContactByIdx(_active_chat_idx, ci)) {
-                            uint32_t expected_ack, est_timeout;
+                            uint32_t est_timeout;
                             the_mesh.sendMessage(ci, _rtc->getCurrentTime(), 0, _chat_draft, expected_ack, est_timeout);
                         }
                     }
+                    // Store in local history too
+                    _task->storeMessage(0, "Me", _chat_draft, _active_chat_idx, _active_chat_is_group, true, expected_ack);
                     _chat_draft[0] = 0;
                     _keyboard_visible = false;
                 }
@@ -1398,7 +1409,7 @@ switch(t){
 #endif
 }
 
-void UITask::storeMessage(uint8_t path_len, const char* from_name, const char* text, uint8_t channel_idx, bool is_group) {
+void UITask::storeMessage(uint8_t path_len, const char* from_name, const char* text, uint8_t channel_idx, bool is_group, bool is_sent, uint32_t ack_hash) {
   _messages_head = (_messages_head + 1) % MAX_STORED_MESSAGES;
   if (_messages_count < MAX_STORED_MESSAGES) _messages_count++;
 
@@ -1406,8 +1417,20 @@ void UITask::storeMessage(uint8_t path_len, const char* from_name, const char* t
   e.timestamp = rtc_clock.getCurrentTime();
   e.channel_idx = channel_idx;
   e.is_group = is_group;
+  e.is_sent = is_sent;
+  e.status = 0; // pending
+  e.ack_hash = ack_hash;
   StrHelper::strzcpy(e.origin, from_name, sizeof(e.origin));
   StrHelper::strzcpy(e.text, text, sizeof(e.text));
+}
+
+void UITask::updateMessageAck(uint32_t ack_hash) {
+  for (int i = 0; i < _messages_count; i++) {
+    if (_messages[i].ack_hash == ack_hash && _messages[i].is_sent) {
+      _messages[i].status = 1; // Acked/Repeated
+      return;
+    }
+  }
 }
 
 bool UITask::getStoredMessage(int newest_index, MessageEntry& out) const {

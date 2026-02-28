@@ -41,6 +41,8 @@ public:
   void disableSerial() { _serial->disable(); }
   virtual void msgRead(int msgcount) = 0;
   virtual void newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount, uint8_t channel_idx = 0xFF, bool is_group = false) = 0;
+  virtual void updateMessageAck(uint32_t ack_hash) = 0;
+  virtual void storeMessage(uint8_t path_len, const char* from_name, const char* text, uint8_t channel_idx = 0xFF, bool is_group = false, bool is_sent = false, uint32_t ack_hash = 0) = 0;
   virtual void notify(UIEventType t = UIEventType::none) = 0;
   virtual void loop() = 0;
 };
