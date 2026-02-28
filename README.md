@@ -1,4 +1,4 @@
-##this is a experimental fork to be able to use a spi tft with touch input.
+! this is a experimental fork to be able to use a spi tft with touch input.
 
 
 ## About MeshCore
