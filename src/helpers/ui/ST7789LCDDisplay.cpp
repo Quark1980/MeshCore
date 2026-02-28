@@ -49,16 +49,17 @@ bool ST7789LCDDisplay::begin() {
 
     display.init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
     display.setRotation(DISPLAY_ROTATION);
-
     display.setSPISpeed(40e6);
-
     display.invertDisplay(DISPLAY_INVERT_COLORS);
 
-    display.fillScreen(ST77XX_BLACK);
-    display.setTextColor(ST77XX_WHITE);
-    display.setTextSize(2 * DISPLAY_SCALE_X); 
-    display.cp437(true); // Use full 256 char 'Code Page 437' font
-  
+    int canvas_w = display.getRotation() % 2 == 0 ? DISPLAY_WIDTH : DISPLAY_HEIGHT;
+    int canvas_h = display.getRotation() % 2 == 0 ? DISPLAY_HEIGHT : DISPLAY_WIDTH;
+    _canvas = new GFXcanvas16(canvas_w, canvas_h);
+    _canvas->fillScreen(ST77XX_BLACK);
+    _canvas->setTextColor(ST77XX_WHITE);
+    _canvas->setTextSize(2 * DISPLAY_SCALE_X); 
+    _canvas->cp437(true);
+
     _isOn = true;
   }
 
@@ -87,25 +88,21 @@ void ST7789LCDDisplay::turnOff() {
 }
 
 void ST7789LCDDisplay::clear() {
-  display.invertDisplay(DISPLAY_INVERT_COLORS);
-
-    display.fillScreen(ST77XX_BLACK);
+  if (_canvas) _canvas->fillScreen(ST77XX_BLACK);
 }
 
 void ST7789LCDDisplay::startFrame(Color bkg) {
   (void)bkg;
-#if DISPLAY_CLEAR_EVERY_FRAME
-  display.invertDisplay(DISPLAY_INVERT_COLORS);
-
-    display.fillScreen(ST77XX_BLACK);
-#endif
-  display.setTextColor(ST77XX_WHITE);
-  display.setTextSize(1 * DISPLAY_SCALE_X); // This one affects size of Please wait... message
-  display.cp437(true); // Use full 256 char 'Code Page 437' font
+  if (_canvas) {
+    _canvas->fillScreen(ST77XX_BLACK);
+    _canvas->setTextColor(ST77XX_WHITE);
+    _canvas->setTextSize(1 * DISPLAY_SCALE_X);
+    _canvas->cp437(true);
+  }
 }
 
 void ST7789LCDDisplay::setTextSize(int sz) {
-  display.setTextSize(sz * DISPLAY_SCALE_X);
+  if (_canvas) _canvas->setTextSize(sz * DISPLAY_SCALE_X);
 }
 
 void ST7789LCDDisplay::setColor(Color c) {
@@ -138,23 +135,23 @@ void ST7789LCDDisplay::setColor(Color c) {
       _color = ST77XX_WHITE;
       break;
   }
-  display.setTextColor(_color);
+  if (_canvas) _canvas->setTextColor(_color);
 }
 
 void ST7789LCDDisplay::setCursor(int x, int y) {
-  display.setCursor(x * DISPLAY_SCALE_X, y * DISPLAY_SCALE_Y);
+  if (_canvas) _canvas->setCursor(x * DISPLAY_SCALE_X, y * DISPLAY_SCALE_Y);
 }
 
 void ST7789LCDDisplay::print(const char* str) {
-  display.print(str);
+  if (_canvas) _canvas->print(str);
 }
 
 void ST7789LCDDisplay::fillRect(int x, int y, int w, int h) {
-  display.fillRect(x * DISPLAY_SCALE_X, y * DISPLAY_SCALE_Y, w * DISPLAY_SCALE_X, h * DISPLAY_SCALE_Y, _color);
+  if (_canvas) _canvas->fillRect(x * DISPLAY_SCALE_X, y * DISPLAY_SCALE_Y, w * DISPLAY_SCALE_X, h * DISPLAY_SCALE_Y, _color);
 }
 
 void ST7789LCDDisplay::drawRect(int x, int y, int w, int h) {
-  display.drawRect(x * DISPLAY_SCALE_X, y * DISPLAY_SCALE_Y, w * DISPLAY_SCALE_X, h * DISPLAY_SCALE_Y, _color);
+  if (_canvas) _canvas->drawRect(x * DISPLAY_SCALE_X, y * DISPLAY_SCALE_Y, w * DISPLAY_SCALE_X, h * DISPLAY_SCALE_Y, _color);
 }
 
 void ST7789LCDDisplay::drawXbm(int x, int y, const uint8_t* bits, int w, int h) {
@@ -168,7 +165,7 @@ void ST7789LCDDisplay::drawXbm(int x, int y, const uint8_t* bits, int w, int h) 
       if (pixelOn) {
         for (int dy = 0; dy < DISPLAY_SCALE_X; dy++) {
           for (int dx = 0; dx < DISPLAY_SCALE_X; dx++) {
-            display.drawPixel(x * DISPLAY_SCALE_X + i * DISPLAY_SCALE_X + dx, y * DISPLAY_SCALE_Y + j * DISPLAY_SCALE_X + dy, _color);
+            if (_canvas) _canvas->drawPixel(x * DISPLAY_SCALE_X + i * DISPLAY_SCALE_X + dx, y * DISPLAY_SCALE_Y + j * DISPLAY_SCALE_X + dy, _color);
           }
         }
       }
@@ -179,11 +176,15 @@ void ST7789LCDDisplay::drawXbm(int x, int y, const uint8_t* bits, int w, int h) 
 uint16_t ST7789LCDDisplay::getTextWidth(const char* str) {
   int16_t x1, y1;
   uint16_t w, h;
-  display.getTextBounds(str, 0, 0, &x1, &y1, &w, &h);
-
-  return w / DISPLAY_SCALE_X;
+  if (_canvas) {
+    _canvas->getTextBounds(str, 0, 0, &x1, &y1, &w, &h);
+    return w / DISPLAY_SCALE_X;
+  }
+  return 0;
 }
 
 void ST7789LCDDisplay::endFrame() {
-  // display.display();
+  if (_canvas) {
+    display.drawRGBBitmap(0, 0, _canvas->getBuffer(), _canvas->width(), _canvas->height());
+  }
 }

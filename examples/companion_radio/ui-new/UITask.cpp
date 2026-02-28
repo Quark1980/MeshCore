@@ -190,7 +190,7 @@ public:
     display.setTextSize(1);
     display.drawTextCentered(display.width()/2, 42, FIRMWARE_BUILD_DATE);
 
-    return 0;
+    return 2000;
   }
 
   void poll() override {
@@ -937,7 +937,7 @@ public:
       renderPower(display);
     }
 
-    return 0;
+    return 250;
   }
 
   bool handleInput(char c) override {

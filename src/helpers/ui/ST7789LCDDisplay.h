@@ -20,6 +20,7 @@ class ST7789LCDDisplay : public DisplayDriver {
     SPIClass displaySPI;
   #endif
   Adafruit_ST7789 display;
+  GFXcanvas16* _canvas;
   bool _isOn;
   uint16_t _color;
   RefCountedDigitalPin* _peripher_power;
