@@ -63,6 +63,8 @@ public:
   void print(const char* str) override;
   void fillRect(int x, int y, int w, int h) override;
   void drawRect(int x, int y, int w, int h) override;
+  void drawRoundRect(int x, int y, int w, int h, int r) override;
+  void fillRoundRect(int x, int y, int w, int h, int r) override;
   void drawXbm(int x, int y, const uint8_t* bits, int w, int h) override;
   uint16_t getTextWidth(const char* str) override;
   void endFrame() override;

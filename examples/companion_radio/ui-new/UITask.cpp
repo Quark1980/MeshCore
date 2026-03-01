@@ -407,6 +407,7 @@ private:
   void drawTabRail(DisplayDriver& display) {
     int tab_x = 2;
     int tab_w = _rail_w - 4;
+    int r = 4; // Rounded radius
     for (int i = 0; i < TAB_COUNT; i++) {
         int y = tabY(i);
         bool active = (i == _tab);
@@ -416,14 +417,14 @@ private:
 
         if (active) {
             display.setColor(DisplayDriver::NEON_CYAN);
-            display.drawRect(tab_x, y, tab_w, _tab_h);
-            display.drawRect(tab_x + 1, y + 1, tab_w - 2, _tab_h - 2);
+            display.drawRoundRect(tab_x, y, tab_w, _tab_h, r);
+            display.drawRoundRect(tab_x + 1, y + 1, tab_w - 2, _tab_h - 2, r);
         } else if (unread) {
             display.setColor(DisplayDriver::DARK_GREEN);
-            display.drawRect(tab_x, y, tab_w, _tab_h);
+            display.drawRoundRect(tab_x, y, tab_w, _tab_h, r);
         } else {
             display.setColor(DisplayDriver::SLATE_GREY);
-            display.drawRect(tab_x, y, tab_w, _tab_h);
+            display.drawRoundRect(tab_x, y, tab_w, _tab_h, r);
         }
 
         display.setColor(active ? DisplayDriver::NEON_CYAN : (unread ? DisplayDriver::DARK_GREEN : DisplayDriver::GREY));
@@ -434,10 +435,11 @@ private:
   void drawButton(DisplayDriver& display, int x, int y, int w, int h, const char* label, bool active) {
     if (w < 8 || h < 8) return;
 
+    int r = 4;
     display.setColor(active ? DisplayDriver::NEON_CYAN : DisplayDriver::SLATE_GREY);
-    display.drawRect(x, y, w, h);
+    display.drawRoundRect(x, y, w, h, r);
     if (active) {
-        display.drawRect(x + 1, y + 1, w - 2, h - 2);
+        display.drawRoundRect(x + 1, y + 1, w - 2, h - 2, r);
     }
 
     display.setColor(active ? DisplayDriver::NEON_CYAN : DisplayDriver::LIGHT);
@@ -748,9 +750,9 @@ private:
 
   void drawKey(DisplayDriver& display, int x, int y, int w, int h, const char* label) {
     display.setColor(DisplayDriver::DARK);
-    display.fillRect(x, y, w, h);
+    display.fillRoundRect(x, y, w, h, 2);
     display.setColor(DisplayDriver::SLATE_GREY);
-    display.drawRect(x, y, w, h); // Cyber-tech: Always use slate grey for inactive keys
+    display.drawRoundRect(x, y, w, h, 2); // Cyber-tech: Always use slate grey for inactive keys
     display.setColor(DisplayDriver::LIGHT);
     display.drawTextCentered(x + w / 2, y + (h - 12) / 2, label);
   }
@@ -767,10 +769,12 @@ private:
     // Static channels for now: Public + any custom
     for (int i = 0; i < 4; i++) {
         ChannelDetails ch;
-      display.setColor(i == _active_chat_idx ? DisplayDriver::NEON_CYAN : DisplayDriver::SLATE_GREY);
-      display.drawRect(dx, dy + i * 20, dw, 20);
-      display.setColor(i == _active_chat_idx ? DisplayDriver::NEON_CYAN : DisplayDriver::LIGHT);
-      display.drawTextLeftAlign(dx + 6, dy + 4 + i * 20, ch.name);
+        if (the_mesh.getChannel(i, ch)) {
+          display.setColor(i == _active_chat_idx ? DisplayDriver::NEON_CYAN : DisplayDriver::SLATE_GREY);
+          display.drawRoundRect(dx, dy + i * 20, dw, 20, 2);
+          display.setColor(i == _active_chat_idx ? DisplayDriver::NEON_CYAN : DisplayDriver::LIGHT);
+          display.drawTextLeftAlign(dx + 6, dy + 4 + i * 20, ch.name);
+        }
     }
   }
 

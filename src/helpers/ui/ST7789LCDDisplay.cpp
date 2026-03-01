@@ -163,6 +163,14 @@ void ST7789LCDDisplay::drawRect(int x, int y, int w, int h) {
   if (_canvas) _canvas->drawRect(x * DISPLAY_SCALE_X, y * DISPLAY_SCALE_Y, w * DISPLAY_SCALE_X, h * DISPLAY_SCALE_Y, _color);
 }
 
+void ST7789LCDDisplay::drawRoundRect(int x, int y, int w, int h, int r) {
+  if (_canvas) _canvas->drawRoundRect(x * DISPLAY_SCALE_X, y * DISPLAY_SCALE_Y, w * DISPLAY_SCALE_X, h * DISPLAY_SCALE_Y, r * DISPLAY_SCALE_X, _color);
+}
+
+void ST7789LCDDisplay::fillRoundRect(int x, int y, int w, int h, int r) {
+  if (_canvas) _canvas->fillRoundRect(x * DISPLAY_SCALE_X, y * DISPLAY_SCALE_Y, w * DISPLAY_SCALE_X, h * DISPLAY_SCALE_Y, r * DISPLAY_SCALE_X, _color);
+}
+
 void ST7789LCDDisplay::drawXbm(int x, int y, const uint8_t* bits, int w, int h) {
   uint8_t byteWidth = (w + 7) / 8;
 
