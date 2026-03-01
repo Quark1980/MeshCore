@@ -150,7 +150,10 @@ static const uint8_t tab_icon_link[] = {
   0x0C, 0x12, 0x30, 0x0C, 0x06, 0x09, 0x30, 0x00
 };
 static const uint8_t tab_icon_power[] = {
-  0x18, 0x18, 0x18, 0x7E, 0xC3, 0xC3, 0x7E, 0x00
+  0x18, 0x18, 0x7E, 0xDB, 0xDB, 0x7E, 0x18, 0x18
+};
+static const uint8_t tab_icon_setup[] = {
+  0x18, 0x3C, 0x7E, 0xFF, 0xFF, 0x7E, 0x3C, 0x18
 };
 
 class SplashScreen : public UIScreen {
@@ -214,7 +217,7 @@ public:
 
 class HomeScreen : public UIScreen {
 public:
-  enum Tab { TAB_MESSAGES, TAB_NEARBY, TAB_CHAT, TAB_RADIO, TAB_LINK, TAB_POWER, TAB_OFFLINE, TAB_RAW, TAB_COUNT };
+  enum Tab { TAB_MESSAGES, TAB_NEARBY, TAB_CHAT, TAB_RADIO, TAB_LINK, TAB_POWER, TAB_SETTINGS, TAB_RAW, TAB_COUNT };
 private:
   Tab _tab;
 
@@ -231,6 +234,12 @@ private:
   int _msg_scroll;
   int _nearby_scroll;
   
+  int _settings_cursor;
+  bool _num_input_visible;
+  char _num_input_buf[16];
+  const char* _num_input_title;
+  bool _editing_node_name;
+
   bool _radio_raw_mode;
   bool _power_armed;
   uint32_t _power_armed_until;
@@ -328,6 +337,7 @@ private:
       case TAB_RADIO: return tab_icon_radio;
       case TAB_LINK: return tab_icon_link;
       case TAB_POWER: return tab_icon_power;
+      case TAB_SETTINGS: return tab_icon_setup;
       default: return tab_icon_messages;
     }
   }
@@ -340,6 +350,7 @@ private:
       case TAB_RADIO: return "RF";
       case TAB_LINK: return "BLE";
       case TAB_POWER: return "PWR";
+      case TAB_SETTINGS: return "SET";
       default: return "TAB";
     }
   }
@@ -914,6 +925,101 @@ private:
     }
   }
 
+  void applyUKNarrowPreset() {
+    _node_prefs->freq = 869.525f;
+    _node_prefs->bw = 62.5f;
+    _node_prefs->sf = 9;
+    _node_prefs->cr = 5; // 4/5
+    _node_prefs->tx_power_dbm = 14;
+    the_mesh.savePrefs();
+    _task->showAlert("UK Narrow Applied", 2000);
+  }
+
+  void renderSettings(DisplayDriver& display) {
+    int x = _content_x;
+    int w = _content_w;
+    int panel_h = _screen_h - _list_y - 6;
+
+    if (_num_input_visible) {
+        renderNumKeypad(display);
+        return;
+    }
+
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x, _list_y, w, panel_h);
+
+    const int SETTINGS_COUNT = 10;
+    const char* labels[SETTINGS_COUNT] = {
+        "UK Narrow Preset",
+        "Node Name",
+        "Frequency",
+        "Spreading Factor",
+        "Bandwidth",
+        "Coding Rate",
+        "TX Power",
+        "BLE PIN",
+        "GPS Mode",
+        "Buzzer"
+    };
+
+    int list_w = w - _scroll_btn_w - 4;
+    for (int i = 0; i < _list_rows; i++) {
+        int idx = i; // simple scroll for now
+        if (idx >= SETTINGS_COUNT) break;
+
+        int y = _list_y + i * _row_h;
+        bool selected = (idx == _settings_cursor);
+
+        display.setColor(selected ? DisplayDriver::NEON_CYAN : DisplayDriver::SLATE_GREY);
+        display.drawRoundRect(x + 1, y, list_w - 2, _row_h - 1, 4);
+
+        display.setColor(DisplayDriver::LIGHT);
+        display.drawTextLeftAlign(x + 6, y + 4, labels[idx]);
+
+        char val[32] = "";
+        display.setColor(DisplayDriver::NEON_CYAN);
+        switch(idx) {
+            case 1: snprintf(val, sizeof(val), "%s", _node_prefs->node_name); break;
+            case 2: snprintf(val, sizeof(val), "%.3f", _node_prefs->freq); break;
+            case 3: snprintf(val, sizeof(val), "SF%d", _node_prefs->sf); break;
+            case 4: snprintf(val, sizeof(val), "%.1f", _node_prefs->bw); break;
+            case 5: snprintf(val, sizeof(val), "4/%d", _node_prefs->cr); break;
+            case 6: snprintf(val, sizeof(val), "%ddBm", _node_prefs->tx_power_dbm); break;
+            case 7: snprintf(val, sizeof(val), "%06lu", _node_prefs->ble_pin); break;
+            case 8: snprintf(val, sizeof(val), "%s", _node_prefs->gps_enabled ? "ON" : "OFF"); break;
+            case 9: snprintf(val, sizeof(val), "%s", _node_prefs->buzzer_quiet ? "QUIET" : "BEEP"); break;
+        }
+        display.drawTextRightAlign(x + list_w - 6, y + 4, val);
+    }
+  }
+
+  void renderNumKeypad(DisplayDriver& display) {
+    int x = _content_x;
+    int w = _content_w;
+    int panel_h = _screen_h - _list_y - 6;
+
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x, _list_y, w, panel_h);
+
+    display.setColor(DisplayDriver::NEON_CYAN);
+    display.drawTextCentered(x + w / 2, _list_y + 4, _num_input_title);
+    
+    display.setColor(DisplayDriver::SLATE_GREY);
+    display.drawRoundRect(x + 10, _list_y + 20, w - 20, 24, 4);
+    display.setColor(DisplayDriver::LIGHT);
+    display.drawTextCentered(x + w / 2, _list_y + 24, _num_input_buf);
+
+    const char* nkeys[12] = {"1","2","3","4","5","6","7","8","9",".","0","X"};
+    int kw = (w - 20) / 3;
+    int kh = (panel_h - 60) / 4;
+    for (int i = 0; i < 12; i++) {
+        int kx = x + 10 + (i % 3) * kw;
+        int ky = _list_y + 48 + (i / 3) * kh;
+        drawButton(display, kx + 2, ky + 2, kw - 4, kh - 4, nkeys[i], false);
+    }
+    drawButton(display, x + w - 45, _list_y + panel_h - 22, 40, 20, "OK", true);
+  }
+
   void activateCurrentTab() {
     if (_tab == TAB_LINK) {
       if (_task->isSerialEnabled()) _task->disableSerial();
@@ -946,8 +1052,10 @@ public:
        _radio_raw_mode(false),
        _power_armed(false), _power_armed_until(0),
        _msg_unread(false), _chat_unread(false) {
-    _chat_draft[0] = 0;
-  }
+     _chat_draft[0] = 0;
+     _num_input_buf[0] = 0;
+     _num_input_title = "";
+   }
 
   void setUnread(Tab tab) {
       if (tab == TAB_MESSAGES) _msg_unread = true;
@@ -971,6 +1079,7 @@ public:
     else if (_tab == TAB_RADIO) title = _radio_raw_mode ? "Radio Raw" : "Radio";
     else if (_tab == TAB_LINK) title = "Link";
     else if (_tab == TAB_POWER) title = "Power";
+    else if (_tab == TAB_SETTINGS) title = "Settings";
 
     drawChrome(display, title);
     drawTabRail(display);
@@ -988,6 +1097,8 @@ public:
       renderLink(display);
     } else if (_tab == TAB_POWER) {
       renderPower(display);
+    } else if (_tab == TAB_SETTINGS) {
+      renderSettings(display);
     }
 
     return 250;
@@ -1038,6 +1149,61 @@ public:
       return true;
     }
 
+    if (_tab == TAB_SETTINGS) {
+        if (_num_input_visible) {
+            if (c == KEY_ENTER) {
+                // OK (simplified keyboard mapping)
+                float fval = atof(_num_input_buf);
+                int ival = atoi(_num_input_buf);
+                switch(_settings_cursor) {
+                    case 2: _node_prefs->freq = fval; break;
+                    case 3: _node_prefs->sf = (uint8_t)ival; break;
+                    case 4: _node_prefs->bw = fval; break;
+                    case 5: _node_prefs->cr = (uint8_t)ival; break;
+                    case 6: _node_prefs->tx_power_dbm = (int8_t)ival; break;
+                    case 7: _node_prefs->ble_pin = (uint32_t)atoll(_num_input_buf); break;
+                }
+                the_mesh.savePrefs();
+                _num_input_visible = false;
+                return true;
+            }
+            if (c == KEY_CANCEL || c == KEY_SELECT) {
+                _num_input_visible = false;
+                return true;
+            }
+        } else {
+            if (c == KEY_DOWN) {
+                _settings_cursor = (_settings_cursor + 1) % 10;
+                return true;
+            }
+            if (c == KEY_UP) {
+                _settings_cursor = (_settings_cursor + 9) % 10;
+                return true;
+            }
+            if (c == KEY_ENTER) {
+                int idx = _settings_cursor;
+                if (idx == 0) applyUKNarrowPreset();
+                else if (idx == 1) {
+                    _editing_node_name = true;
+                    _keyboard_visible = true;
+                    strncpy(_chat_draft, _node_prefs->node_name, sizeof(_chat_draft));
+                } else if (idx >= 2 && idx <= 7) {
+                    _num_input_visible = true;
+                    _num_input_buf[0] = 0;
+                    const char* l[] = {"","","Freq","SF","BW","CR","TX Power","BLE PIN"};
+                    _num_input_title = l[idx];
+                } else if (idx == 8) {
+                    _node_prefs->gps_enabled = !_node_prefs->gps_enabled;
+                    the_mesh.savePrefs();
+                } else if (idx == 9) {
+                    _node_prefs->buzzer_quiet = !_node_prefs->buzzer_quiet;
+                    the_mesh.savePrefs();
+                }
+                return true;
+            }
+        }
+    }
+
     return false;
   }
 
@@ -1070,7 +1236,14 @@ public:
                 return true;
             }
             if (isInRect(x, y, 250, bottom_y, 65, kh)) {
-                // SEND
+                // SEND / OK
+                if (_editing_node_name) {
+                    strncpy(_node_prefs->node_name, _chat_draft, sizeof(_node_prefs->node_name));
+                    the_mesh.savePrefs();
+                    _editing_node_name = false;
+                    _keyboard_visible = false;
+                    return true;
+                }
                 if (_chat_draft[0] != 0 && _active_chat_idx != 0xFF) {
                     uint32_t expected_ack = 0;
                     if (_active_chat_is_group) {
@@ -1127,9 +1300,78 @@ public:
         if (isInRect(x, y, 0, tabY(tab), _rail_w, _tab_h)) {
           _tab = (Tab)tab;
           _show_msg_detail = false;
+          _keyboard_visible = false;
+          _num_input_visible = false;
+          _editing_node_name = false;
           return true;
         }
       }
+    }
+
+    if (_tab == TAB_SETTINGS) {
+        if (_num_input_visible) {
+            int kw = (_content_w - 20) / 3;
+            int kh = (_screen_h - _list_y - 6 - 60) / 4;
+            const char* nkeys[12] = {"1","2","3","4","5","6","7","8","9",".","0","X"};
+            for (int i = 0; i < 12; i++) {
+                int kx = _content_x + 10 + (i % 3) * kw;
+                int ky = _list_y + 48 + (i / 3) * kh;
+                if (isInRect(x, y, kx, ky, kw, kh)) {
+                    if (i == 11) { // X (backspace)
+                        int len = strlen(_num_input_buf);
+                        if (len > 0) _num_input_buf[len-1] = 0;
+                    } else if (strlen(_num_input_buf) < sizeof(_num_input_buf) - 1) {
+                        strcat(_num_input_buf, nkeys[i]);
+                    }
+                    return true;
+                }
+            }
+            if (isInRect(x, y, _content_x + _content_w - 45, _list_y + (_screen_h - _list_y - 6) - 22, 40, 20)) {
+                // OK
+                float fval = atof(_num_input_buf);
+                int ival = atoi(_num_input_buf);
+                switch(_settings_cursor) {
+                    case 2: _node_prefs->freq = fval; break;
+                    case 3: _node_prefs->sf = (uint8_t)ival; break;
+                    case 4: _node_prefs->bw = fval; break;
+                    case 5: _node_prefs->cr = (uint8_t)ival; break;
+                    case 6: _node_prefs->tx_power_dbm = (int8_t)ival; break;
+                    case 7: _node_prefs->ble_pin = (uint32_t)atoll(_num_input_buf); break;
+                }
+                the_mesh.savePrefs();
+                _num_input_visible = false;
+                return true;
+            }
+            return true;
+        }
+
+        int list_w = _content_w - _scroll_btn_w - 4;
+        for (int i = 0; i < _list_rows; i++) {
+            int idx = i;
+            int iy = _list_y + i * _row_h;
+            if (isInRect(x, y, _content_x + 1, iy, list_w - 2, _row_h - 1)) {
+                _settings_cursor = idx;
+                if (idx == 0) applyUKNarrowPreset();
+                else if (idx == 1) {
+                    _editing_node_name = true;
+                    _keyboard_visible = true;
+                    strncpy(_chat_draft, _node_prefs->node_name, sizeof(_chat_draft));
+                } else if (idx >= 2 && idx <= 7) {
+                    _num_input_visible = true;
+                    _num_input_buf[0] = 0;
+                    const char* l[] = {"","","Freq","SF","BW","CR","TX Power","BLE PIN"};
+                    _num_input_title = l[idx];
+                } else if (idx == 8) {
+                    _node_prefs->gps_enabled = !_node_prefs->gps_enabled;
+                    the_mesh.savePrefs();
+                } else if (idx == 9) {
+                    _node_prefs->buzzer_quiet = !_node_prefs->buzzer_quiet;
+                    the_mesh.savePrefs();
+                }
+                return true;
+            }
+        }
+        return true;
     }
 
     if (_tab == TAB_MESSAGES) {
