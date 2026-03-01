@@ -136,76 +136,89 @@
 
 #include "icons.h"
 
-// 8x8 tab icons for compact left-side rail
-static const uint8_t tab_icon_messages[] = {
-  0x00, 0x7E, 0x42, 0x5A, 0x66, 0x42, 0x7E, 0x00
-};
-static const uint8_t tab_icon_nearby[] = {
-  0x10, 0x38, 0x7C, 0x10, 0x10, 0x28, 0x44, 0x00
-};
-static const uint8_t tab_icon_radio[] = {
-  0x10, 0x18, 0x5C, 0x7E, 0x5C, 0x18, 0x10, 0x00
-};
-static const uint8_t tab_icon_link[] = {
-  0x0C, 0x12, 0x30, 0x0C, 0x06, 0x09, 0x30, 0x00
-};
-static const uint8_t tab_icon_power[] = {
-  0x18, 0x18, 0x7E, 0xDB, 0xDB, 0x7E, 0x18, 0x18
-};
-static const uint8_t tab_icon_setup[] = {
-  0x18, 0x3C, 0x7E, 0xFF, 0xFF, 0x7E, 0x3C, 0x18
-};
+// 16x16 tactical icons
+static const uint8_t icon_home_16[] = { 0x00,0x00,0x80,0x01,0xc0,0x03,0xe0,0x07,0x70,0x0e,0x38,0x1c,0xfc,0x3f,0x18,0x18,0x18,0x18,0x18,0x18,0x18,0x18,0x18,0x18,0xf8,0x1f,0x00,0x00,0x00,0x00,0x00,0x00 };
+static const uint8_t icon_chat_16[] = { 0x00,0x00,0xfe,0x7f,0x01,0x80,0x01,0x80,0x01,0x80,0x01,0x80,0x01,0x80,0x01,0x80,0x01,0x80,0x01,0x80,0xfe,0x7f,0x00,0x0c,0x00,0x18,0x00,0x30,0x00,0x00,0x00,0x00 };
+static const uint8_t icon_map_16[] = { 0x80,0x01,0xc0,0x03,0xe0,0x07,0x70,0x0e,0x38,0x1c,0x1c,0x38,0x0e,0x70,0x07,0xe0,0x0e,0x70,0x1c,0x38,0x38,0x1c,0x70,0x0e,0xe0,0x07,0xc0,0x03,0x80,0x01,0x00,0x00 };
+static const uint8_t icon_nodes_16[] = { 0x00,0x00,0x0c,0x30,0x1e,0x78,0x1e,0x78,0x0c,0x30,0x00,0x00,0x0c,0x30,0x1e,0x78,0x1e,0x78,0x0c,0x30,0x00,0x00,0x0c,0x30,0x1e,0x78,0x1e,0x78,0x0c,0x30,0x00,0x00 };
+static const uint8_t icon_radio_16[] = { 0x80,0x01,0x80,0x01,0x80,0x01,0x80,0x01,0x80,0x01,0xff,0xff,0x80,0x01,0x80,0x01,0x3c,0x3c,0x42,0x42,0x81,0x81,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
+static const uint8_t icon_settings_16[] = { 0x00,0x30,0x18,0x18,0x3c,0x3c,0x7e,0x7e,0xff,0xff,0x7e,0x7e,0x3c,0x3c,0x18,0x18,0x30,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
+static const uint8_t icon_log_16[] = { 0x00,0x00,0x1c,0x00,0x30,0x00,0x60,0x00,0xff,0xff,0x60,0x00,0x30,0x00,0x1c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
+static const uint8_t icon_ble_16[] = { 0x80,0x01,0x84,0x21,0x88,0x11,0x90,0x09,0xa0,0x05,0xc0,0x03,0x80,0x01,0xc0,0x03,0xa0,0x05,0x90,0x09,0x88,0x11,0x84,0x21,0x80,0x01,0x00,0x00,0x00,0x00,0x00,0x00 };
+static const uint8_t icon_power_16[] = { 0x80,0x01,0x80,0x01,0x80,0x01,0x80,0x01,0x82,0x41,0x84,0x21,0x48,0x12,0x30,0x0c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
 
 class SplashScreen : public UIScreen {
   UITask* _task;
   unsigned long dismiss_after;
   char _version_info[12];
 
-public:
-  SplashScreen(UITask* task) : _task(task) {
-    // strip off dash and commit hash by changing dash to null terminator
-    // e.g: v1.2.3-abcdef -> v1.2.3
-    const char *ver = FIRMWARE_VERSION;
-    const char *dash = strchr(ver, '-');
+  public:
+    SplashScreen(UITask* task) : _task(task) {
+      // strip off dash and commit hash by changing dash to null terminator
+      // e.g: v1.2.3-abcdef -> v1.2.3
+      const char *ver = FIRMWARE_VERSION;
+      const char *dash = strchr(ver, '-');
 
-    int len = dash ? dash - ver : strlen(ver);
-    if (len >= sizeof(_version_info)) len = sizeof(_version_info) - 1;
-    memcpy(_version_info, ver, len);
-    _version_info[len] = 0;
+      int len = dash ? dash - ver : strlen(ver);
+      if (len >= sizeof(_version_info)) len = sizeof(_version_info) - 1;
+      memcpy(_version_info, ver, len);
+      _version_info[len] = 0;
 
-    dismiss_after = millis() + BOOT_SCREEN_MILLIS;
+      // Extend to 5 seconds
+      dismiss_after = millis() + 5000;
+    }
+
+    int render(DisplayDriver& display) override {
+      display.setColor(DisplayDriver::DARK);
+      display.fillRect(0, 0, display.width(), display.height());
+
+      int mid_x = display.width() / 2;
+
+      // Calculate fade color: smooth fade in over the first 1000ms
+      uint32_t now = millis();
+      uint32_t elapsed = 5000 - (dismiss_after - now);
+      float progress = (float)elapsed / 1000.0f; 
+
+      DisplayDriver::Color c = DisplayDriver::CHARCOAL;
+      if (progress >= 1.0f) c = DisplayDriver::LIGHT;
+      else if (progress > 0.8f) c = DisplayDriver::GREY;
+      else if (progress > 0.5f) c = DisplayDriver::SLATE_GREY;
+      else if (progress > 0.2f) c = DisplayDriver::DARK_GREY;
+
+      // 1. MeshCore Logo
+      display.setColor(c);
+      int logoWidth = 128;
+      display.drawXbm(mid_x - 64, 15, meshcore_logo, logoWidth, 13);
+
+      // 2. Base attribution
+      display.setTextSize(1);
+      char base_info[64];
+      snprintf(base_info, sizeof(base_info), "Powered by MeshCore %s", _version_info);
+      display.drawTextCentered(mid_x, 35, base_info);
+
+      // 3. Large "TOUCH" Headline
+      display.setTextSize(6);
+      display.drawTextCentered(mid_x, 85, "TOUCH");
+
+      // 4. Touch Version & Date
+      display.setTextSize(2);
+      display.drawTextCentered(mid_x, 155, "v1.1.0 - 2026.02.28");
+
+      // 5. Author Credit
+      display.setTextSize(1);
+      display.drawTextCentered(mid_x, 210, "Created by Quark1980");
+
+      return 50; // Redraw every 50ms for smooth fade
+    }
+
+  bool handleTouch(int x, int y) override {
+    _task->gotoHomeScreen();
+    return true;
   }
 
-  int render(DisplayDriver& display) override {
-    display.setColor(DisplayDriver::DARK);
-    display.fillRect(0, 0, display.width(), display.height());
-
-    int mid_x = display.width() / 2;
-
-    // 1. MeshCore Logo
-    display.setColor(DisplayDriver::LIGHT);
-    int logoWidth = 128;
-    display.drawXbm(mid_x - 64, 15, meshcore_logo, logoWidth, 13);
-
-    // 2. Base attribution
-    display.setTextSize(1);
-    char base_info[64];
-    snprintf(base_info, sizeof(base_info), "Powered by MeshCore %s", _version_info);
-    display.drawTextCentered(mid_x, 35, base_info);
-
-    // 3. Large "TOUCH" Headline
-    display.setTextSize(6);
-    display.drawTextCentered(mid_x, 85, "TOUCH");
-
-    // 4. Touch Version & Date
-    display.setTextSize(2);
-    display.drawTextCentered(mid_x, 155, "v1.1.0 - 2026.02.28");
-
-    // 5. Author Credit
-    display.setTextSize(1);
-    display.drawTextCentered(mid_x, 210, "Created by Quark1980");
-
-    return 2000; // Splash redrawn every 2s is plenty
+  bool handleInput(char c) override {
+    _task->gotoHomeScreen();
+    return true;
   }
 
   void poll() override {
@@ -217,9 +230,17 @@ public:
 
 class HomeScreen : public UIScreen {
 public:
-  enum Tab { TAB_MESSAGES, TAB_NEARBY, TAB_CHAT, TAB_RADIO, TAB_LINK, TAB_POWER, TAB_SETTINGS, TAB_RAW, TAB_COUNT };
+  enum Tab { TAB_HOME, TAB_CHAT, TAB_MAP, TAB_NODES, TAB_GPS, TAB_CONFIG, TAB_LOG, TAB_BLE, TAB_POWER, TAB_COUNT };
 private:
   Tab _tab;
+  bool _is_dashboard;
+
+  // Layout Constants
+  const int _topbar_h = 25;   // Top navigation bar height
+  const int _num_tabs = 9;    // Number of tabs in the top bar
+  const int _grid_cols = 4;
+  const int _grid_rows = 2;
+  int _active_tile = 0;
 
   uint8_t _active_chat_idx;
   bool _active_chat_is_group;
@@ -235,6 +256,7 @@ private:
   int _nearby_scroll;
   
   int _settings_cursor;
+  int _settings_scroll;
   bool _num_input_visible;
   char _num_input_buf[16];
   const char* _num_input_title;
@@ -244,6 +266,14 @@ private:
   bool _power_armed;
   uint32_t _power_armed_until;
   AdvertPath recent[UI_RECENT_LIST_SIZE];
+
+  // Map state
+  float _map_zoom = 1.0f; // meters per pixel
+  int _map_offset_x = 0;
+  int _map_offset_y = 0;
+  bool _map_dragging = false;
+  int _map_drag_last_x = 0;
+  int _map_drag_last_y = 0;
 
   bool _msg_unread = false;
   bool _chat_unread = false;
@@ -260,10 +290,10 @@ private:
   int _tab_top = 6;
   int _tab_h = 42;
   int _tab_gap = 4;
-  int _content_x = 62;
-  int _content_w = 252;
+  int _content_x = 0;
+  int _content_w = 320;
   int _header_h = 34;
-  int _list_y = 44;
+  int _list_y = 48;
   int _row_h = 24;
   int _list_rows = 8;
 
@@ -278,6 +308,7 @@ private:
   int _radio_toggle_y = 48;
   int _radio_toggle_h = 20;
   int _radio_toggle_w = 100;
+  int _radio_adv_btn_y = 170;
   int _radio_reset_y = 204;
   int _radio_reset_h = 24;
 
@@ -285,19 +316,12 @@ private:
     _screen_w = display.width();
     _screen_h = display.height();
 
-    _rail_w = (_screen_w >= 300) ? 40 : 25;
-    _tab_top = (_screen_h >= 220) ? 6 : 4;
-    _tab_gap = (_screen_h >= 220) ? 4 : 2;
-    _tab_h = (_screen_h - _tab_top * 2 - (TAB_COUNT - 1) * _tab_gap) / TAB_COUNT;
-    if (_tab_h < 16) _tab_h = 16;
+    _content_x = 0;
+    _content_w = _screen_w;
 
-    _content_x = _rail_w + 6;
-    _content_w = _screen_w - _content_x - 6;
-    if (_content_w < 24) _content_w = 24;
-
-    _header_h = (_screen_h >= 220) ? 34 : (_screen_h >= 180 ? 28 : 22);
-    _row_h = (_screen_h >= 220) ? 24 : (_screen_h >= 180 ? 20 : 14);
-    _list_y = _header_h + 10;
+    _header_h = _topbar_h;  // header IS the top bar
+    _row_h = 24;
+    _list_y = _topbar_h + 18;  // top bar + small sub-header
     _list_rows = (_screen_h - _list_y - 8) / _row_h;
     if (_list_rows < 1) _list_rows = 1;
     if (_list_rows > 8) _list_rows = 8;
@@ -316,6 +340,7 @@ private:
 
     _radio_reset_h = (_screen_h >= 220) ? 24 : 18;
     _radio_reset_y = _screen_h - _radio_reset_h - 8;
+    _radio_adv_btn_y = _radio_reset_y - _link_btn_h - 4;
 
     _scroll_btn_w = (_screen_w >= 300) ? 28 : 22;
     _scroll_up_y = _list_y;
@@ -330,29 +355,43 @@ private:
     return (x >= rx) && (y >= ry) && (x < rx + rw) && (y < ry + rh);
   }
 
-  const uint8_t* tabIcon(uint8_t i) const {
-    switch (i) {
-      case TAB_MESSAGES: return tab_icon_messages;
-      case TAB_NEARBY: return tab_icon_nearby;
-      case TAB_RADIO: return tab_icon_radio;
-      case TAB_LINK: return tab_icon_link;
-      case TAB_POWER: return tab_icon_power;
-      case TAB_SETTINGS: return tab_icon_setup;
-      default: return tab_icon_messages;
-    }
+  const  uint8_t* tabIcon(uint8_t i) {
+    if (i == TAB_HOME) return icon_home_16;
+    if (i == TAB_CHAT) return icon_chat_16;
+    if (i == TAB_MAP) return icon_map_16;
+    if (i == TAB_NODES) return icon_nodes_16;
+    if (i == TAB_GPS) return icon_radio_16;
+    if (i == TAB_CONFIG) return icon_settings_16;
+    if (i == TAB_LOG) return icon_log_16;
+    if (i == TAB_BLE) return icon_ble_16;
+    if (i == TAB_POWER) return icon_power_16;
+    return icon_settings_16;
   }
 
-  const char* tabLabel(uint8_t i) const {
-    switch (i) {
-      case TAB_MESSAGES: return "MSG";
-      case TAB_NEARBY: return "NBR";
-      case TAB_CHAT: return "CHT";
-      case TAB_RADIO: return "RF";
-      case TAB_LINK: return "BLE";
-      case TAB_POWER: return "PWR";
-      case TAB_SETTINGS: return "SET";
-      default: return "TAB";
-    }
+  const char* tabShortLabel(uint8_t i) {
+    if (i == TAB_HOME)   return "HOME";
+    if (i == TAB_CHAT)   return "CHAT";
+    if (i == TAB_MAP)    return "MAP";
+    if (i == TAB_NODES)  return "NODE";
+    if (i == TAB_GPS)    return "RDIO";
+    if (i == TAB_CONFIG) return "CFG";
+    if (i == TAB_LOG)    return "LOG";
+    if (i == TAB_BLE)    return "BLE";
+    if (i == TAB_POWER)  return "PWR";
+    return "?";
+  }
+
+  const char* tabLabel(uint8_t i) {
+    if (i == TAB_HOME)   return "HOME";
+    if (i == TAB_CHAT)   return "CHAT";
+    if (i == TAB_MAP)    return "MAP";
+    if (i == TAB_NODES)  return "NODES";
+    if (i == TAB_GPS)    return "RADIO";
+    if (i == TAB_CONFIG) return "SETTINGS";
+    if (i == TAB_LOG)    return "MSG LOG";
+    if (i == TAB_BLE)    return "BLE/LINK";
+    if (i == TAB_POWER)  return "POWER";
+    return "???";
   }
 
   void formatAge(uint32_t timestamp, char* out, size_t out_len) {
@@ -368,79 +407,179 @@ private:
   }
 
   void drawChrome(DisplayDriver& display, const char* title) {
+    display.setTextSize(1);
+    // Full width black background below top bar
     display.setColor(DisplayDriver::DARK);
-    display.fillRect(0, 0, _screen_w, _screen_h);
+    display.fillRect(0, _topbar_h, _screen_w, _screen_h - _topbar_h);
 
-    // Slim Status Bar at top
-    int status_h = 24;
-    display.setColor(DisplayDriver::SLATE_GREY);
-    display.drawRect(0, 0, _screen_w, status_h);
-    
-    // Battery & Node Name
-    char node[sizeof(_node_prefs->node_name)];
-    display.translateUTF8ToBlocks(node, _node_prefs->node_name, sizeof(node));
-    int batt_mv = _task->getBattMilliVolts();
-    int batt_pct = (batt_mv - 3300) * 100 / 900;
-    if (batt_pct < 0) batt_pct = 0;
-    if (batt_pct > 100) batt_pct = 100;
-
-    int batt_w = 20;
-    int batt_h = 9;
-    int batt_x = _screen_w - batt_w - 6;
-    int batt_y = (status_h - batt_h) / 2;
-
-    display.setColor(DisplayDriver::SLATE_GREY);
-    display.drawRect(batt_x, batt_y, batt_w, batt_h);
-    display.fillRect(batt_x + batt_w, batt_y + 2, 2, batt_h - 4);
-    int batt_fill = ((batt_w - 2) * batt_pct) / 100;
-    if (batt_fill > 0) {
-      display.setColor(DisplayDriver::NEON_CYAN);
-      display.fillRect(batt_x + 1, batt_y + 1, batt_fill, batt_h - 2);
-    }
-
-    display.setColor(DisplayDriver::LIGHT); // White for node name
-    display.drawTextEllipsized(_rail_w + 6, 6, _content_w - batt_w - 30, node);
-
-    char batt_txt[8];
-    snprintf(batt_txt, sizeof(batt_txt), "%d%%", batt_pct);
-    display.setColor(DisplayDriver::NEON_CYAN);
-    display.drawTextRightAlign(batt_x - 4, 6, batt_txt);
-
-    // Title / Header below status bar
+    // Sub-header: small title in the area between topbar and list
     display.setColor(DisplayDriver::LIGHT);
-    display.drawTextLeftAlign(_content_x + 4, _header_h - 10, title);
-    
-    // Thin horizontal separator
+    display.drawTextLeftAlign(8, _topbar_h + 4, title);
+
+    // Tiny separator line
     display.setColor(DisplayDriver::SLATE_GREY);
-    display.fillRect(_content_x, _header_h + 2, _content_w, 1);
+    display.fillRect(4, _topbar_h + 16, _screen_w - 8, 1);
   }
 
-  void drawTabRail(DisplayDriver& display) {
-    int tab_x = 2;
-    int tab_w = _rail_w - 4;
-    int r = 4; // Rounded radius
-    for (int i = 0; i < TAB_COUNT; i++) {
-        int y = tabY(i);
-        bool active = (i == _tab);
-        bool unread = false;
-        if (i == TAB_MESSAGES && _msg_unread) unread = true;
-        if (i == TAB_CHAT && _chat_unread) unread = true;
+  void drawTopBar(DisplayDriver& display) {
+    // Background
+    display.setColor(DisplayDriver::CHARCOAL);
+    display.fillRect(0, 0, _screen_w, _topbar_h);
 
+    // Subtle bottom separator
+    display.setColor(DisplayDriver::DARK_GREY);
+    display.fillRect(0, _topbar_h - 1, _screen_w, 1);
+
+    // 9 tab buttons, Home is slightly wider
+    int extra_w = 14; 
+    int home_w = (_screen_w / _num_tabs) + extra_w;
+    int other_w = (_screen_w - home_w) / (_num_tabs - 1);
+
+    for (int i = 0; i < _num_tabs; i++) {
+        int tx = (i == 0) ? 0 : home_w + (i - 1) * other_w;
+        int tw = (i == 0) ? home_w : other_w;
+        int ty = 1;
+        int th = _topbar_h - 2;
+        bool active = !_is_dashboard && (_tab == (Tab)i);
+
+        // Active tab: neon cyan filled rounded rect
         if (active) {
             display.setColor(DisplayDriver::NEON_CYAN);
-            display.drawRoundRect(tab_x, y, tab_w, _tab_h, r);
-            display.drawRoundRect(tab_x + 1, y + 1, tab_w - 2, _tab_h - 2, r);
-        } else if (unread) {
-            display.setColor(DisplayDriver::DARK_GREEN);
-            display.drawRoundRect(tab_x, y, tab_w, _tab_h, r);
+            display.fillRoundRect(tx + 1, ty, tw - 2, th, 3);
+            display.setColor(DisplayDriver::DARK);
         } else {
-            display.setColor(DisplayDriver::SLATE_GREY);
-            display.drawRoundRect(tab_x, y, tab_w, _tab_h, r);
+            display.setColor(DisplayDriver::DARK_GREY);
+            display.drawRoundRect(tx + 1, ty, tw - 2, th, 3);
+            display.setColor(DisplayDriver::LIGHT);
         }
-
-        display.setColor(active ? DisplayDriver::NEON_CYAN : (unread ? DisplayDriver::DARK_GREEN : DisplayDriver::GREY));
-        display.drawTextCentered(tab_x + tab_w / 2, y + (_tab_h / 2) - 3, tabLabel(i));
+        
+        // For the home tab, use the icon if it fits better, or just text.
+        // The prompt asks for text "HOME".
+        display.drawTextCentered(tx + tw / 2, ty + (th / 2) - 4, tabShortLabel(i));
     }
+  }
+
+  void renderHome(DisplayDriver& display) {
+    int x = _content_x;
+    int w = _content_w;
+    int panel_h = _screen_h - _list_y - 6;
+
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x, _list_y, w, panel_h);
+
+    // 1. Large Clock
+    uint32_t now = _rtc->getCurrentTime();
+    struct tm ti;
+    // Calculate time manually (MeshCore uses Unix timestamp)
+    time_t t_now = now;
+    gmtime_r(&t_now, &ti); // Assuming UTC for now, or local time if configured
+
+    char time_str[8];
+    snprintf(time_str, sizeof(time_str), "%02d:%02d", ti.tm_hour, ti.tm_min);
+    
+    int clock_y = _list_y + 10;
+    display.setColor(DisplayDriver::LIGHT);
+    display.setTextSize(4);
+    display.drawTextCentered(x + w / 2, clock_y, time_str);
+    display.setTextSize(1);
+
+    // Seconds bar
+    int sec_w = (w - 40) * ti.tm_sec / 59;
+    display.setColor(DisplayDriver::DARK_GREY);
+    display.fillRect(x + 20, clock_y + 35, w - 40, 4);
+    display.setColor(DisplayDriver::NEON_CYAN);
+    display.fillRect(x + 20, clock_y + 35, sec_w, 4);
+
+    // 2. Statistics Row
+    int stat_y = clock_y + 50;
+    
+    // Messages
+    int total_msgs = _task->getStoredMessageCount();
+    char msg_str[32];
+    snprintf(msg_str, sizeof(msg_str), "Msgs: %d", total_msgs);
+    display.setColor(DisplayDriver::LIGHT);
+    display.drawTextLeftAlign(x + 20, stat_y, msg_str);
+
+    // Nearby Nodes
+    the_mesh.getRecentlyHeard(recent, UI_RECENT_LIST_SIZE);
+    int active_nodes = 0;
+    for (int i = 0; i < UI_RECENT_LIST_SIZE; i++) {
+        if (recent[i].name[0] != 0) active_nodes++;
+    }
+    char node_str[32];
+    snprintf(node_str, sizeof(node_str), "Nodes: %d", active_nodes);
+    display.drawTextRightAlign(x + w - 20, stat_y, node_str);
+
+    // 3. Signal Strength Indicator
+    int sig_y = stat_y + 25;
+    float rssi = radio_driver.getLastRSSI();
+    
+    // Draw 5 bars
+    int bar_w = 12;
+    int bar_gap = 4;
+    int total_bar_w = 5 * bar_w + 4 * bar_gap;
+    int start_x = x + (w - total_bar_w) / 2;
+    
+    int active_bars = 0;
+    if (rssi > -60) active_bars = 5;
+    else if (rssi > -80) active_bars = 4;
+    else if (rssi > -100) active_bars = 3;
+    else if (rssi > -115) active_bars = 2;
+    else if (rssi > -130) active_bars = 1;
+
+    for (int i = 0; i < 5; i++) {
+        int h = 10 + i * 5; // Bar height increases
+        int bx = start_x + i * (bar_w + bar_gap);
+        int by = sig_y + 30 - h; // Bottom aligned
+        
+        display.setColor(i < active_bars ? DisplayDriver::NEON_CYAN : DisplayDriver::DARK_GREY);
+        display.fillRect(bx, by, bar_w, h);
+    }
+
+    // Text below bars
+    char sig_str[32];
+    snprintf(sig_str, sizeof(sig_str), "RSSI: %.0f dBm  SNR: %.1f", rssi, radio_driver.getLastSNR());
+    display.setColor(DisplayDriver::SLATE_GREY);
+    display.drawTextCentered(x + w / 2, sig_y + 38, sig_str);
+  }
+
+  void drawDashboard(DisplayDriver& display) {
+    display.setTextSize(1);
+    int margin = 8;
+    int grid_w = _content_w - (margin * 2);
+    int tw = (grid_w - (margin * (_grid_cols - 1))) / _grid_cols;
+    int th = 75; // Even more compact for 4x2
+    
+    int total_h = (_grid_rows * th) + ((_grid_rows - 1) * margin);
+    int start_y = (_screen_h - total_h) / 2;
+
+    for (int i = 0; i < TAB_COUNT - 1; i++) { // Skip the COUNT enum
+        int col = i % _grid_cols;
+        int row = i / _grid_cols;
+        int tx = _content_x + margin + col * (tw + margin);
+        int ty = start_y + row * (th + margin);
+        drawTile(display, tx, ty, tw, th, tabLabel(i), tabIcon((Tab)i), (i == (_active_tile % (TAB_COUNT-1))));
+    }
+  }
+
+  void drawTile(DisplayDriver& display, int x, int y, int w, int h, const char* label, const uint8_t* icon, bool active) {
+    display.setColor(DisplayDriver::DARK_GREY); 
+    display.fillRoundRect(x, y, w, h, 8);
+
+    if (active) {
+        display.setColor(DisplayDriver::NEON_CYAN);
+        display.drawRoundRect(x, y, w, h, 8);
+    }
+
+    // Icon (16x16 Tactical)
+    int ix = x + (w - 16) / 2;
+    int iy = y + (h / 2) - 14;
+    display.setColor(active ? DisplayDriver::NEON_CYAN : DisplayDriver::LIGHT);
+    display.drawXbm(ix, iy, icon, 16, 16); 
+    
+    // Small native text
+    display.setTextSize(1);
+    display.drawTextCentered(x + w / 2, y + h - 14, label);
   }
 
   void drawButton(DisplayDriver& display, int x, int y, int w, int h, const char* label, bool active) {
@@ -627,6 +766,154 @@ private:
     drawButton(display, btn_x, _scroll_down_y, _scroll_btn_w, _row_h, "v", false);
   }
 
+  void renderMap(DisplayDriver& display) {
+    int x = _content_x;
+    int w = _content_w;
+    int panel_h = _screen_h - _list_y - 2;
+
+    display.setColor(DisplayDriver::DARK);
+    display.fillRect(x, _list_y, w, panel_h);
+
+    // Collect local GPS (may be 0 if no fix)
+    double lat1 = _sensors->node_lat;
+    double lon1 = _sensors->node_lon;
+    bool have_local_gps = (lat1 != 0.0 || lon1 != 0.0);
+
+    // Scan contacts for GPS data
+    int gps_count = 0;
+    double first_lat = 0, first_lon = 0;
+    for (int i = 0; i < the_mesh.getNumContacts(); i++) {
+        ContactInfo ci;
+        if (the_mesh.getContactByIdx(i, ci) && ci.gps_lat != 0) {
+            if (gps_count == 0) { first_lat = ci.gps_lat / 1000000.0; first_lon = ci.gps_lon / 1000000.0; }
+            gps_count++;
+        }
+    }
+
+    if (!have_local_gps && gps_count == 0) {
+        display.setColor(DisplayDriver::GREY);
+        display.drawTextCentered(x + w/2, _list_y + panel_h/2 - 8, "No GPS data available");
+        display.setColor(DisplayDriver::SLATE_GREY);
+        display.drawTextCentered(x + w/2, _list_y + panel_h/2 + 6, "Set position in Settings");
+        // still draw zoom buttons
+        drawButton(display, x + w - 36, _list_y + 8,  30, 22, "+", false);
+        drawButton(display, x + w - 36, _list_y + 34, 30, 22, "-", false);
+        return;
+    }
+
+    // Use own GPS as reference; fall back to first known contact if no local GPS
+    double ref_lat = have_local_gps ? lat1 : first_lat;
+    double ref_lon = have_local_gps ? lon1 : first_lon;
+
+    // Map origin on screen (content center + pan offset)
+    int cx = x + w/2 + _map_offset_x;
+    int cy = _list_y + panel_h/2 + _map_offset_y;
+
+    // Scale: _map_zoom = meters per pixel. Default 1.0 = 1m/px
+    // At default zoom, 100m = 100 pixels → reasonable for short range
+    // Clamp zoom
+    if (_map_zoom < 0.5f)   _map_zoom = 0.5f;
+    if (_map_zoom > 5000.0f) _map_zoom = 5000.0f;
+
+    // Draw grid
+    display.setColor(DisplayDriver::DARK_GREY);
+    // choose a round grid interval based on zoom
+    float grid_m = 100.0f;
+    if (_map_zoom > 500) grid_m = 50000.0f;
+    else if (_map_zoom > 100) grid_m = 10000.0f;
+    else if (_map_zoom > 20)  grid_m = 1000.0f;
+    else if (_map_zoom > 5)   grid_m = 500.0f;
+    float grid_px = grid_m / _map_zoom;
+    if (grid_px > 8) {
+        // Vertical lines
+        float startX = fmod((float)(cx - x), grid_px);
+        for (float gx = startX; gx < w; gx += grid_px)
+            display.drawFastVLine(x + (int)gx, _list_y, panel_h);
+        // Horizontal lines
+        float startY = fmod((float)(cy - _list_y), grid_px);
+        for (float gy = startY; gy < panel_h; gy += grid_px)
+            display.drawFastHLine(x, _list_y + (int)gy, w);
+    }
+
+    // Draw local node (ME) if we have GPS
+    if (have_local_gps) {
+        display.setColor(DisplayDriver::NEON_CYAN);
+        display.fillCircle(cx, cy, 4);
+        display.drawCircle(cx, cy, 6);
+        display.drawTextCentered(cx, cy + 10, "ME");
+    }
+
+    // Draw all contacts with GPS
+    for (int i = 0; i < the_mesh.getNumContacts(); i++) {
+        ContactInfo ci;
+        if (!the_mesh.getContactByIdx(i, ci)) continue;
+        if (ci.gps_lat == 0 && ci.gps_lon == 0) continue;
+
+        double lat2 = ci.gps_lat / 1000000.0;
+        double lon2 = ci.gps_lon / 1000000.0;
+
+        // Meters offset from reference point
+        double dx_m = (lon2 - ref_lon) * 111320.0 * cos(ref_lat * M_PI / 180.0);
+        double dy_m = (ref_lat - lat2) * 111320.0; // Y inverted for screen
+
+        int nx = cx + (int)(dx_m / _map_zoom);
+        int ny = cy + (int)(dy_m / _map_zoom);
+
+        // Draw line from ME to node (only if we have local GPS)
+        if (have_local_gps) {
+            display.setColor(DisplayDriver::SLATE_GREY);
+            display.drawLine(cx, cy, nx, ny);
+        }
+
+        // Draw node marker (triangle pointing up) even if off-screen: clamp to border
+        bool on_screen = (nx > x + 4 && nx < x + w - 4 && ny > _list_y + 4 && ny < _list_y + panel_h - 4);
+        if (!on_screen) {
+            // Draw a small arrow at the edge pointing toward the node
+            int edge_x = nx < x + 4 ? x + 4 : (nx > x + w - 4 ? x + w - 4 : nx);
+            int edge_y = ny < _list_y + 4 ? _list_y + 4 : (ny > _list_y + panel_h - 4 ? _list_y + panel_h - 4 : ny);
+            display.setColor(DisplayDriver::GREY);
+            display.fillCircle(edge_x, edge_y, 3);
+        } else {
+            display.setColor(DisplayDriver::LIGHT);
+            display.fillTriangle(nx, ny - 5, nx - 4, ny + 3, nx + 4, ny + 3);
+
+            // Label with distance
+            char label[48];
+            if (have_local_gps) {
+                double dist_m = sqrt(dx_m * dx_m + dy_m * dy_m);
+                if (dist_m > 1000)
+                    snprintf(label, sizeof(label), "%s %.1fkm", ci.name, dist_m / 1000.0);
+                else
+                    snprintf(label, sizeof(label), "%s %dm", ci.name, (int)dist_m);
+            } else {
+                snprintf(label, sizeof(label), "%s", ci.name);
+            }
+            display.setColor(DisplayDriver::NEON_CYAN);
+            display.drawTextCentered(nx, ny + 8, label);
+        }
+    }
+
+    // Status bar: GPS fix status + node count
+    char status[48];
+    if (have_local_gps)
+        snprintf(status, sizeof(status), "GPS OK  Nodes:%d", gps_count);
+    else
+        snprintf(status, sizeof(status), "No local GPS  Nodes:%d", gps_count);
+    display.setColor(DisplayDriver::GREY);
+    display.drawTextLeftAlign(x + 4, _list_y + panel_h - 12, status);
+
+    // Zoom buttons (right side, prominent)
+    drawButton(display, x + w - 36, _list_y + 8,  30, 22, "+", false);
+    drawButton(display, x + w - 36, _list_y + 34, 30, 22, "-", false);
+
+    // Zoom level label
+    char zoom_str[16];
+    if (_map_zoom < 1000) snprintf(zoom_str, sizeof(zoom_str), "%.0fm/px", _map_zoom);
+    else snprintf(zoom_str, sizeof(zoom_str), "%.1fkm/px", _map_zoom / 1000.0f);
+    display.setColor(DisplayDriver::GREY);
+    display.drawTextCentered(x + w - 21, _list_y + 60, zoom_str);
+  }
+
   void renderChat(DisplayDriver& display) {
     int x = _content_x;
     int w = _content_w;
@@ -664,42 +951,159 @@ private:
     // Middle: History (Filtered)
     int hist_y = _list_y + 30;
     int hist_h = input_y - hist_y - 4;
-    int rows = hist_h / 14;
-    int shown = 0;
-    for (int i = 0; i < _task->getStoredMessageCount() && shown < rows; i++) {
+    int message_bottom_y = input_y - 4; // Start drawing messages from the bottom of the history area
+
+    // Step 1: Collect messages to display by working backwards through the history, measuring heights
+    const int MAX_VISIBLE_MSGS = 30;
+    int msg_indices[MAX_VISIBLE_MSGS];
+    int msg_heights[MAX_VISIBLE_MSGS];
+    int num_matching = 0;
+    int total_height = 0;
+
+    int text_x = x + 66;
+    int text_w = w - 70;
+
+    // Scan messages to find which ones fit and their exact heights
+    for (int i = 0; i < _task->getStoredMessageCount(); i++) {
         UITask::MessageEntry e;
-        if (!_task->getStoredMessage(i + _chat_scroll, e)) break;
-        
+        // _chat_scroll indicates how many matching messages to skip from the newest
+        int actual_idx = i;
+        if (!_task->getStoredMessage(actual_idx, e)) break;
+
         bool match = false;
         if (_active_chat_idx != 0xFF) {
             if (_active_chat_is_group) {
                 match = e.is_group && (e.channel_idx == _active_chat_idx);
             } else {
-                // For direct, we'd need pubkey matching, but for now we'll match by channel_idx=0xFF and origin name prefix
-                // This is a simplification for the first version
                 match = !e.is_group && (e.channel_idx == 0xFF);
             }
         }
 
         if (match) {
-            int ry = hist_y + (rows - 1 - shown) * 14;
-            if (e.is_sent) {
-                display.setColor(e.status == 1 ? DisplayDriver::GREEN : DisplayDriver::RED);
-                char tag[16];
-                snprintf(tag, sizeof(tag), " Me:%d", e.repeat_count);
-                display.drawTextEllipsized(x + 4, ry, 60, tag);
-            } else {
-                display.setColor(DisplayDriver::BLUE);
-                display.drawTextEllipsized(x + 4, ry, 60, e.origin);
+            if (_chat_scroll > 0) {
+               _chat_scroll--; // skip this message
+               continue;
             }
-            display.setColor(DisplayDriver::LIGHT);
-            display.drawTextEllipsized(x + 66, ry, w - 70, e.text);
-            shown++;
+
+            int h = measureTextWrapped(display, text_w, e.text);
+            int block_h = h > 14 ? h : 14; 
+            
+            msg_indices[num_matching] = actual_idx;
+            msg_heights[num_matching] = block_h;
+            num_matching++;
+            total_height += (block_h + 4); 
+
+            if (total_height > hist_h || num_matching >= MAX_VISIBLE_MSGS) {
+                break;
+            }
         }
+    }
+
+    // Step 2: Draw the collected messages from bottom to top
+    int current_y = message_bottom_y;
+    for (int i = 0; i < num_matching; i++) {
+        UITask::MessageEntry e;
+        _task->getStoredMessage(msg_indices[i], e);
+        int block_h = msg_heights[i];
+        
+        current_y -= (block_h + 4); // moving cursor UP
+        if (current_y < hist_y - 12) break; // sanity check against drawing over header
+
+        int ry = current_y;
+
+        // Draw sender info
+        if (e.is_sent) {
+            display.setColor(e.status == 1 ? DisplayDriver::GREEN : DisplayDriver::RED);
+            char tag[16];
+            snprintf(tag, sizeof(tag), " Me:%d", e.repeat_count);
+            display.drawTextEllipsized(x + 4, ry, 60, tag);
+        } else {
+            display.setColor(DisplayDriver::BLUE);
+            display.drawTextEllipsized(x + 4, ry, 60, e.origin);
+        }
+
+        // Draw message body wrapped
+        display.setColor(DisplayDriver::LIGHT);
+        drawTextWrapped(display, text_x, ry, text_w, e.text);
     }
 
     if (_keyboard_visible) renderKeyboard(display);
     if (_chat_dropdown_open) renderChatDropdown(display);
+  }
+
+  // --- Word-wrapping helpers ---
+  // Returns the height (in pixels) required to render the string
+  int measureTextWrapped(DisplayDriver& display, int max_w, const char* str) {
+      if (!str || str[0] == '\0') return 12;
+      
+      int lines = 1;
+      char word[64];
+      int word_len = 0;
+      int current_w = 0;
+      int space_w = display.getTextWidth(" ");
+
+      for (int i = 0; ; i++) {
+          char c = str[i];
+          if (c == ' ' || c == '\n' || c == '\0' || word_len >= 63) {
+              word[word_len] = '\0';
+              if (word_len > 0) {
+                  int w = display.getTextWidth(word);
+                  if (current_w + w > max_w && current_w > 0) {
+                      lines++;
+                      current_w = w + space_w;
+                  } else {
+                      current_w += w + space_w;
+                  }
+                  word_len = 0;
+              }
+              if (c == '\n') {
+                  lines++;
+                  current_w = 0;
+              }
+              if (c == '\0') break;
+          } else {
+              word[word_len++] = c;
+          }
+      }
+      return lines * 13; // 13px line height
+  }
+
+  // Draws the string wrapped at max_w and returns the height consumed
+  int drawTextWrapped(DisplayDriver& display, int x, int y, int max_w, const char* str) {
+      if (!str || str[0] == '\0') return 12;
+
+      int start_y = y;
+      char word[64];
+      int word_len = 0;
+      int current_w = 0;
+      int space_w = display.getTextWidth(" ");
+
+      for (int i = 0; ; i++) {
+          char c = str[i];
+          // break on space, newline, null terminator, or if word is too long
+          if (c == ' ' || c == '\n' || c == '\0' || word_len >= 63) {
+              word[word_len] = '\0';
+              if (word_len > 0) {
+                  int w = display.getTextWidth(word);
+                  if (current_w + w > max_w && current_w > 0) {
+                      // New line
+                      y += 13;
+                      current_w = 0;
+                  }
+                  display.drawTextLeftAlign(x + current_w, y, word);
+                  current_w += w + space_w;
+                  word_len = 0;
+              }
+              if (c == '\n') {
+                  y += 13;
+                  current_w = 0;
+              }
+              if (c == '\0') break;
+          } else {
+              word[word_len++] = c;
+          }
+      }
+      return (y - start_y) + 13;
   }
 
   void renderKeyboard(DisplayDriver& display) {
@@ -753,8 +1157,15 @@ private:
 
     // Special keys
     int bottom_y = ky + 3 * (kh + 4);
-    drawKey(display, 4, bottom_y, 45, kh, _kb_shift == 0 ? "ABC" : "abc");
-    drawKey(display, 55, bottom_y, 130, kh, "SPACE");
+    // Case toggle (ABC/abc) - Only relevant if not in symbols mode
+    const char* case_label = (_kb_shift == 1) ? "abc" : "ABC";
+    drawKey(display, 4, bottom_y, 36, kh, case_label);
+    
+    // Mode toggle (123 / ABC)
+    const char* mode_label = (_kb_shift == 2) ? "ABC" : "123";
+    drawKey(display, 45, bottom_y, 36, kh, mode_label);
+    
+    drawKey(display, 86, bottom_y, 98, kh, "SPACE");
     drawKey(display, 190, bottom_y, 55, kh, "BKSP");
     drawKey(display, 250, bottom_y, 65, kh, "SEND");
   }
@@ -824,39 +1235,39 @@ private:
       display.drawTextLeftAlign(x + 6, y, tmp);
       y += 16;
       display.drawTextLeftAlign(x + 6, y, "Tap Raw for TX/RX diagnostics");
-      return;
+    } else {
+      display.setColor(DisplayDriver::LIGHT);
+      snprintf(tmp, sizeof(tmp), "RSSI: %.1f dBm", radio_driver.getLastRSSI());
+      display.drawTextLeftAlign(x + 6, y, tmp);
+      y += 12;
+      snprintf(tmp, sizeof(tmp), "SNR:  %.2f dB", radio_driver.getLastSNR());
+      display.drawTextLeftAlign(x + 6, y, tmp);
+      y += 12;
+      snprintf(tmp, sizeof(tmp), "Noise Floor: %d", radio_driver.getNoiseFloor());
+      display.drawTextLeftAlign(x + 6, y, tmp);
+      y += 12;
+      snprintf(tmp, sizeof(tmp), "Pkts RX/TX: %lu / %lu",
+               (unsigned long)radio_driver.getPacketsRecv(),
+               (unsigned long)radio_driver.getPacketsSent());
+      display.drawTextLeftAlign(x + 6, y, tmp);
+      y += 12;
+      snprintf(tmp, sizeof(tmp), "Flood TX/RX: %lu / %lu",
+               (unsigned long)the_mesh.getNumSentFlood(),
+               (unsigned long)the_mesh.getNumRecvFlood());
+      display.drawTextLeftAlign(x + 6, y, tmp);
+      y += 12;
+      snprintf(tmp, sizeof(tmp), "Direct TX/RX: %lu / %lu",
+               (unsigned long)the_mesh.getNumSentDirect(),
+               (unsigned long)the_mesh.getNumRecvDirect());
+      display.drawTextLeftAlign(x + 6, y, tmp);
+      y += 12;
+      snprintf(tmp, sizeof(tmp), "Air TX/RX sec: %lu / %lu",
+               (unsigned long)(the_mesh.getTotalAirTime() / 1000),
+               (unsigned long)(the_mesh.getReceiveAirTime() / 1000));
+      display.drawTextLeftAlign(x + 6, y, tmp);
     }
 
-    display.setColor(DisplayDriver::LIGHT);
-    snprintf(tmp, sizeof(tmp), "RSSI: %.1f dBm", radio_driver.getLastRSSI());
-    display.drawTextLeftAlign(x + 6, y, tmp);
-    y += 12;
-    snprintf(tmp, sizeof(tmp), "SNR:  %.2f dB", radio_driver.getLastSNR());
-    display.drawTextLeftAlign(x + 6, y, tmp);
-    y += 12;
-    snprintf(tmp, sizeof(tmp), "Noise Floor: %d", radio_driver.getNoiseFloor());
-    display.drawTextLeftAlign(x + 6, y, tmp);
-    y += 12;
-    snprintf(tmp, sizeof(tmp), "Pkts RX/TX: %lu / %lu",
-             (unsigned long)radio_driver.getPacketsRecv(),
-             (unsigned long)radio_driver.getPacketsSent());
-    display.drawTextLeftAlign(x + 6, y, tmp);
-    y += 12;
-    snprintf(tmp, sizeof(tmp), "Flood TX/RX: %lu / %lu",
-             (unsigned long)the_mesh.getNumSentFlood(),
-             (unsigned long)the_mesh.getNumRecvFlood());
-    display.drawTextLeftAlign(x + 6, y, tmp);
-    y += 12;
-    snprintf(tmp, sizeof(tmp), "Direct TX/RX: %lu / %lu",
-             (unsigned long)the_mesh.getNumSentDirect(),
-             (unsigned long)the_mesh.getNumRecvDirect());
-    display.drawTextLeftAlign(x + 6, y, tmp);
-    y += 12;
-    snprintf(tmp, sizeof(tmp), "Air TX/RX sec: %lu / %lu",
-             (unsigned long)(the_mesh.getTotalAirTime() / 1000),
-             (unsigned long)(the_mesh.getReceiveAirTime() / 1000));
-    display.drawTextLeftAlign(x + 6, y, tmp);
-
+    drawButton(display, x + 8, _radio_adv_btn_y, w - 16, _link_btn_h, "Send Advert", false);
     drawButton(display, x + 8, _radio_reset_y, w - 16, _radio_reset_h, "Reset Radio Stats", false);
   }
 
@@ -872,32 +1283,31 @@ private:
     display.drawRect(x + 4, _list_y + 4, w - 8, panel_h - 8);
 
     display.setColor(DisplayDriver::NEON_CYAN);
-    display.drawTextCentered(x + w / 2, _list_y + 16, "CONNECTION STATUS");
+    display.drawTextCentered(x + w / 2, _list_y + 10, "CONNECTION STATUS");
     
     display.setColor(DisplayDriver::SLATE_GREY);
-    display.fillRect(x + 10, _list_y + 32, w - 20, 1);
+    display.fillRect(x + 10, _list_y + 20, w - 20, 1);
+
     if (_task->hasConnection()) {
       display.setColor(DisplayDriver::NEON_CYAN);
-      display.drawRect(x + 6, _list_y + 6, w - 12, 18);
-      display.drawRect(x + 7, _list_y + 7, w - 14, 16);
+      display.drawRect(x + 6, _list_y + 24, w - 12, 18);
+      display.drawRect(x + 7, _list_y + 25, w - 14, 16);
       display.setColor(DisplayDriver::NEON_CYAN);
     } else {
       display.setColor(DisplayDriver::LIGHT); // Dimmer white for disconnected
     }
-    display.drawTextCentered(x + w / 2, _list_y + 11, _task->hasConnection() ? "Connected" : "Disconnected");
+    display.drawTextCentered(x + w / 2, _list_y + 29, _task->hasConnection() ? "Connected" : "Disconnected");
 
     char tmp[32];
     if (the_mesh.getBLEPin() != 0) {
       snprintf(tmp, sizeof(tmp), "PIN %d", the_mesh.getBLEPin());
       display.setColor(DisplayDriver::LIGHT);
-      display.drawTextRightAlign(x + w - 8, _list_y + 30, tmp);
+      display.drawTextRightAlign(x + w - 8, _list_y + 45, tmp);
     }
 
     drawButton(display, x + 8, _link_ble_btn_y, w - 16, _link_btn_h,
                _task->isSerialEnabled() ? "Disable BLE" : "Enable BLE",
                _task->isSerialEnabled());
-
-    drawButton(display, x + 8, _link_adv_btn_y, w - 16, _link_btn_h, "Send Advert", false);
   }
 
   void renderPower(DisplayDriver& display) {
@@ -926,13 +1336,13 @@ private:
   }
 
   void applyUKNarrowPreset() {
-    _node_prefs->freq = 869.525f;
+    _node_prefs->freq = 869.618f;
     _node_prefs->bw = 62.5f;
-    _node_prefs->sf = 9;
-    _node_prefs->cr = 5; // 4/5
+    _node_prefs->sf = 8;
+    _node_prefs->cr = 8; // 4/8
     _node_prefs->tx_power_dbm = 14;
     the_mesh.savePrefs();
-    _task->showAlert("UK Narrow Applied", 2000);
+    _task->showAlert("EU/UK Narrow Applied", 2000);
   }
 
   void renderSettings(DisplayDriver& display) {
@@ -964,7 +1374,7 @@ private:
 
     int list_w = w - _scroll_btn_w - 4;
     for (int i = 0; i < _list_rows; i++) {
-        int idx = i; // simple scroll for now
+        int idx = _settings_scroll + i;
         if (idx >= SETTINGS_COUNT) break;
 
         int y = _list_y + i * _row_h;
@@ -991,6 +1401,11 @@ private:
         }
         display.drawTextRightAlign(x + list_w - 6, y + 4, val);
     }
+
+    // Scroll buttons
+    int btn_x = x + w - _scroll_btn_w;
+    drawButton(display, btn_x, _scroll_up_y, _scroll_btn_w, _row_h, "^", false);
+    drawButton(display, btn_x, _scroll_down_y, _scroll_btn_w, _row_h, "v", false);
   }
 
   void renderNumKeypad(DisplayDriver& display) {
@@ -1021,7 +1436,7 @@ private:
   }
 
   void activateCurrentTab() {
-    if (_tab == TAB_LINK) {
+    if (_tab == TAB_LOG) {
       if (_task->isSerialEnabled()) _task->disableSerial();
       else _task->enableSerial();
       return;
@@ -1035,7 +1450,7 @@ private:
       }
       return;
     }
-    if (_tab == TAB_MESSAGES) {
+    if (_tab == TAB_CHAT) {
       int total = _task->getStoredMessageCount();
       if (total == 0) return;
       _show_msg_detail = !_show_msg_detail;
@@ -1047,7 +1462,8 @@ private:
 public:
   HomeScreen(UITask* task, mesh::RTCClock* rtc, SensorManager* sensors, NodePrefs* node_prefs)
      : _task(task), _rtc(rtc), _sensors(sensors), _node_prefs(node_prefs),
-       _tab(TAB_MESSAGES), _show_msg_detail(false), _msg_cursor(0), _msg_scroll(0), _nearby_scroll(0),
+       _tab(TAB_HOME), _is_dashboard(false), _show_msg_detail(false), _msg_cursor(0), _msg_scroll(0), _nearby_scroll(0),
+       _settings_cursor(0), _settings_scroll(0),
        _active_chat_idx(0), _active_chat_is_group(true), _keyboard_visible(false), _kb_shift(0), _chat_scroll(0), _chat_dropdown_open(false),
        _radio_raw_mode(false),
        _power_armed(false), _power_armed_until(0),
@@ -1058,7 +1474,6 @@ public:
    }
 
   void setUnread(Tab tab) {
-      if (tab == TAB_MESSAGES) _msg_unread = true;
       if (tab == TAB_CHAT) _chat_unread = true;
   }
 
@@ -1066,57 +1481,72 @@ public:
     updateLayout(display);
     display.setTextSize(1);
 
-    if (_tab == TAB_MESSAGES) _msg_unread = false;
+    if (_tab == TAB_CHAT) _msg_unread = false;
     if (_tab == TAB_CHAT) _chat_unread = false;
 
     if (_power_armed && (int32_t)(_power_armed_until - millis()) <= 0) {
       _power_armed = false;
     }
 
-    const char* title = "Messages";
-    if (_tab == TAB_NEARBY) title = "Nearby";
-    else if (_tab == TAB_CHAT) title = "Chat";
-    else if (_tab == TAB_RADIO) title = _radio_raw_mode ? "Radio Raw" : "Radio";
-    else if (_tab == TAB_LINK) title = "Link";
-    else if (_tab == TAB_POWER) title = "Power";
-    else if (_tab == TAB_SETTINGS) title = "Settings";
+    const char* title = tabLabel(_tab);
+    if (_is_dashboard) title = "Launcher";
 
+    drawTopBar(display);
     drawChrome(display, title);
-    drawTabRail(display);
 
-    if (_tab == TAB_MESSAGES) {
-      if (_show_msg_detail) renderMessageDetail(display);
-      else renderMessagesList(display);
-    } else if (_tab == TAB_NEARBY) {
-      renderNearby(display);
-    } else if (_tab == TAB_CHAT) {
-      renderChat(display);
-    } else if (_tab == TAB_RADIO) {
-      renderRadio(display);
-    } else if (_tab == TAB_LINK) {
-      renderLink(display);
-    } else if (_tab == TAB_POWER) {
-      renderPower(display);
-    } else if (_tab == TAB_SETTINGS) {
-      renderSettings(display);
+    if (_is_dashboard) {
+      drawDashboard(display);
+    } else {
+      display.setTextSize(1);
+      if (_tab == TAB_HOME) {
+        renderHome(display);
+      } else if (_tab == TAB_CHAT) {
+        _chat_unread = false;
+        renderChat(display);
+      } else if (_tab == TAB_NODES) {
+        renderNearby(display);
+      } else if (_tab == TAB_GPS) {
+        renderRadio(display);
+      } else if (_tab == TAB_CONFIG) {
+        renderSettings(display);
+      } else if (_tab == TAB_LOG) {
+        renderMessagesList(display);
+      } else if (_tab == TAB_BLE) {
+        renderLink(display);
+      } else if (_tab == TAB_POWER) {
+        renderPower(display);
+      }
     }
 
     return 250;
   }
 
   bool handleInput(char c) override {
-    if (c == KEY_LEFT || c == KEY_PREV) {
-      _tab = (Tab)((_tab + TAB_COUNT - 1) % TAB_COUNT);
-      _show_msg_detail = false;
-      return true;
+    if (_is_dashboard) {
+      if (c == KEY_LEFT || c == KEY_PREV) {
+        _active_tile = (_active_tile + 8) % 9;
+        return true;
+      }
+      if (c == KEY_RIGHT || c == KEY_NEXT) {
+        _active_tile = (_active_tile + 1) % 9;
+        return true;
+      }
+      if (c == KEY_ENTER) {
+        if (_active_tile >= 0 && _active_tile < 9) {
+          _tab = (Tab)_active_tile;
+          _is_dashboard = false;
+        }
+        return true;
+      }
+      return false;
     }
-    if (c == KEY_NEXT || c == KEY_RIGHT) {
-      _tab = (Tab)((_tab + 1) % TAB_COUNT);
-      _show_msg_detail = false;
+
+    if (c == KEY_CANCEL) {
+      _is_dashboard = true;
       return true;
     }
 
-    if (_tab == TAB_MESSAGES) {
+    if (_tab == TAB_CHAT) {
       int total = _task->getStoredMessageCount();
       if (c == KEY_DOWN && !_show_msg_detail && total > 0) {
         _msg_cursor++;
@@ -1134,12 +1564,12 @@ public:
       }
     }
 
-    if (_tab == TAB_RADIO && c == KEY_ENTER) {
+    if (_tab == TAB_GPS && c == KEY_ENTER) {
       _radio_raw_mode = !_radio_raw_mode;
       return true;
     }
 
-    if (_tab == TAB_LINK && c == KEY_ENTER) {
+    if (_tab == TAB_LOG && c == KEY_ENTER) {
       activateCurrentTab();
       return true;
     }
@@ -1149,7 +1579,7 @@ public:
       return true;
     }
 
-    if (_tab == TAB_SETTINGS) {
+    if (_tab == TAB_CONFIG) {
         if (_num_input_visible) {
             if (c == KEY_ENTER) {
                 // OK (simplified keyboard mapping)
@@ -1174,10 +1604,14 @@ public:
         } else {
             if (c == KEY_DOWN) {
                 _settings_cursor = (_settings_cursor + 1) % 10;
+                if (_settings_cursor >= _settings_scroll + _list_rows) _settings_scroll = _settings_cursor - _list_rows + 1;
+                if (_settings_cursor < _settings_scroll) _settings_scroll = _settings_cursor;
                 return true;
             }
             if (c == KEY_UP) {
                 _settings_cursor = (_settings_cursor + 9) % 10;
+                if (_settings_cursor < _settings_scroll) _settings_scroll = _settings_cursor;
+                if (_settings_cursor >= _settings_scroll + _list_rows) _settings_scroll = _settings_cursor - _list_rows + 1;
                 return true;
             }
             if (c == KEY_ENTER) {
@@ -1208,6 +1642,38 @@ public:
   }
 
   bool handleTouch(int x, int y) override {
+    // 0. Top bar: tap a tab to switch views (always highest priority)
+    if (y < _topbar_h) {
+        int extra_w = 14; 
+        int home_w = (_screen_w / _num_tabs) + extra_w;
+        int other_w = (_screen_w - home_w) / (_num_tabs - 1);
+        
+        int tapped = -1;
+        if (x < home_w) {
+            tapped = 0; // TAB_HOME
+        } else {
+            tapped = 1 + (x - home_w) / other_w;
+        }
+
+        if (tapped >= 0 && tapped < _num_tabs) {
+            Tab t = (Tab)tapped;
+            if (!_is_dashboard && _tab == t) {
+                // Tap active tab again → go back to dashboard
+                _is_dashboard = true;
+                _keyboard_visible = false;
+                _num_input_visible = false;
+            } else {
+                _tab = t;
+                _is_dashboard = false;
+                _keyboard_visible = false;
+                _num_input_visible = false;
+                _show_msg_detail = false;
+            }
+        }
+        return true;
+    }
+
+    // 1. Global Overlays: Keyboard, NumKeypad, Chat Dropdown
     if (_keyboard_visible) {
         int kb_h = 160;
         int kb_y = _screen_h - kb_h;
@@ -1218,11 +1684,20 @@ public:
             
             // Check special keys first (bottom row)
             int bottom_y = ky + 3 * (kh + 4);
-            if (isInRect(x, y, 4, bottom_y, 45, kh)) {
-                _kb_shift = (_kb_shift + 1) % 3;
+            // Case toggle (ABC/abc) at (4, bottom_y, 36, kh)
+            if (isInRect(x, y, 4, bottom_y, 36, kh)) {
+                if (_kb_shift == 2) _kb_shift = 1; // From numbers to uppercase
+                else _kb_shift = (_kb_shift == 1) ? 0 : 1; // Toggle between lower and upper
                 return true;
             }
-            if (isInRect(x, y, 55, bottom_y, 130, kh)) {
+            // Mode toggle (123/ABC) at (45, bottom_y, 36, kh)
+            if (isInRect(x, y, 45, bottom_y, 36, kh)) {
+                if (_kb_shift == 2) _kb_shift = 0; // Back to letters
+                else _kb_shift = 2; // Switch to numbers
+                return true;
+            }
+            // Space bar at (86, bottom_y, 98, kh)
+            if (isInRect(x, y, 86, bottom_y, 98, kh)) {
                 int len = strlen(_chat_draft);
                 if (len < sizeof(_chat_draft) - 1) {
                     _chat_draft[len] = ' ';
@@ -1230,6 +1705,7 @@ public:
                 }
                 return true;
             }
+            // Backspace at (190, bottom_y, 55, kh)
             if (isInRect(x, y, 190, bottom_y, 55, kh)) {
                 int len = strlen(_chat_draft);
                 if (len > 0) _chat_draft[len-1] = 0;
@@ -1295,59 +1771,106 @@ public:
         }
     }
 
-    if (x < _rail_w) {
-      for (int tab = 0; tab < TAB_COUNT; tab++) {
-        if (isInRect(x, y, 0, tabY(tab), _rail_w, _tab_h)) {
-          _tab = (Tab)tab;
-          _show_msg_detail = false;
-          _keyboard_visible = false;
-          _num_input_visible = false;
-          _editing_node_name = false;
-          return true;
-        }
-      }
-    }
-
-    if (_tab == TAB_SETTINGS) {
-        if (_num_input_visible) {
-            int kw = (_content_w - 20) / 3;
-            int kh = (_screen_h - _list_y - 6 - 60) / 4;
-            const char* nkeys[12] = {"1","2","3","4","5","6","7","8","9",".","0","X"};
-            for (int i = 0; i < 12; i++) {
-                int kx = _content_x + 10 + (i % 3) * kw;
-                int ky = _list_y + 48 + (i / 3) * kh;
-                if (isInRect(x, y, kx, ky, kw, kh)) {
-                    if (i == 11) { // X (backspace)
-                        int len = strlen(_num_input_buf);
-                        if (len > 0) _num_input_buf[len-1] = 0;
-                    } else if (strlen(_num_input_buf) < sizeof(_num_input_buf) - 1) {
-                        strcat(_num_input_buf, nkeys[i]);
-                    }
-                    return true;
+    if (_num_input_visible) {
+        int kw = (_content_w - 20) / 3;
+        int kh = (_screen_h - _list_y - 6 - 60) / 4;
+        const char* nkeys[12] = {"1","2","3","4","5","6","7","8","9",".","0","X"};
+        for (int i = 0; i < 12; i++) {
+            int kx = _content_x + 10 + (i % 3) * kw;
+            int ky = _list_y + 48 + (i / 3) * kh;
+            if (isInRect(x, y, kx, ky, kw, kh)) {
+                if (i == 11) { // X (backspace)
+                    int len = strlen(_num_input_buf);
+                    if (len > 0) _num_input_buf[len-1] = 0;
+                } else if (strlen(_num_input_buf) < sizeof(_num_input_buf) - 1) {
+                    strcat(_num_input_buf, nkeys[i]);
                 }
-            }
-            if (isInRect(x, y, _content_x + _content_w - 45, _list_y + (_screen_h - _list_y - 6) - 22, 40, 20)) {
-                // OK
-                float fval = atof(_num_input_buf);
-                int ival = atoi(_num_input_buf);
-                switch(_settings_cursor) {
-                    case 2: _node_prefs->freq = fval; break;
-                    case 3: _node_prefs->sf = (uint8_t)ival; break;
-                    case 4: _node_prefs->bw = fval; break;
-                    case 5: _node_prefs->cr = (uint8_t)ival; break;
-                    case 6: _node_prefs->tx_power_dbm = (int8_t)ival; break;
-                    case 7: _node_prefs->ble_pin = (uint32_t)atoll(_num_input_buf); break;
-                }
-                the_mesh.savePrefs();
-                _num_input_visible = false;
                 return true;
             }
+        }
+        if (isInRect(x, y, _content_x + _content_w - 45, _list_y + (_screen_h - _list_y - 6) - 22, 40, 20)) {
+            // OK
+            float fval = atof(_num_input_buf);
+            int ival = atoi(_num_input_buf);
+            switch(_settings_cursor) {
+                case 2: _node_prefs->freq = fval; break;
+                case 3: _node_prefs->sf = (uint8_t)ival; break;
+                case 4: _node_prefs->bw = fval; break;
+                case 5: _node_prefs->cr = (uint8_t)ival; break;
+                case 6: _node_prefs->tx_power_dbm = (int8_t)ival; break;
+                case 7: _node_prefs->ble_pin = (uint32_t)atoll(_num_input_buf); break;
+            }
+            the_mesh.savePrefs();
+            _num_input_visible = false;
+            return true;
+        }
+        return true; // Absorb all touches in NumKeypad area
+    }
+
+    if (_tab == TAB_CHAT && _chat_dropdown_open) {
+        int dx = _content_x + 10;
+        int dy = _list_y + 26;
+        int dw = _content_w - 20;
+        if (isInRect(x, y, dx, dy, dw, 120)) {
+            int row = (y - dy - 6) / 20;
+            if (row >= 0 && row < MAX_GROUP_CHANNELS) {
+                ChannelDetails ch;
+                if (the_mesh.getChannel(row, ch)) {
+                    _active_chat_idx = row;
+                    _active_chat_is_group = true;
+                }
+            }
+            _chat_dropdown_open = false;
+            return true;
+        }
+        _chat_dropdown_open = false; // Close dropdown if touched outside
+        return true;
+    }
+
+
+    // 3. Dashboard: Tile selection (Launcher)
+    if (_is_dashboard) {
+        // Match drawDashboard geometry EXACTLY
+        int margin = 8;
+        int grid_w = _content_w - (margin * 2);
+        int tw = (grid_w - (margin * (_grid_cols - 1))) / _grid_cols;
+        int th = 75;
+        int total_h = (_grid_rows * th) + ((_grid_rows - 1) * margin);
+        int start_y = (_screen_h - total_h) / 2;
+
+        for (int i = 0; i < TAB_COUNT - 1; i++) { // Iterate through all tabs for dashboard
+            int col = i % _grid_cols;
+            int row = i / _grid_cols;
+            int tx = _content_x + margin + col * (tw + margin);
+            int ty = start_y + row * (th + margin);
+
+            if (isInRect(x, y, tx, ty, tw, th)) {
+                _tab = (Tab)i;
+                _is_dashboard = false;
+                _show_msg_detail = false; // Reset detail view when changing tabs
+                return true;
+            }
+        }
+        return true;
+    }
+
+    // 4. Tab-Specific Content
+    if (_tab == TAB_CONFIG) {
+        // Scroll buttons
+        int btn_x = _content_x + _content_w - _scroll_btn_w;
+        if (isInRect(x, y, btn_x, _list_y, _scroll_btn_w, 40)) {
+            if (_settings_scroll > 0) _settings_scroll--;
+            return true;
+        }
+        if (isInRect(x, y, btn_x, _screen_h - 40, _scroll_btn_w, 40)) {
+            if (_settings_scroll + _list_rows < 10) _settings_scroll++;
             return true;
         }
 
         int list_w = _content_w - _scroll_btn_w - 4;
         for (int i = 0; i < _list_rows; i++) {
-            int idx = i;
+            int idx = _settings_scroll + i;
+            if (idx >= 10) break;
             int iy = _list_y + i * _row_h;
             if (isInRect(x, y, _content_x + 1, iy, list_w - 2, _row_h - 1)) {
                 _settings_cursor = idx;
@@ -1374,13 +1897,26 @@ public:
         return true;
     }
 
-    if (_tab == TAB_MESSAGES) {
+    if (_tab == TAB_CHAT) {
       if (_show_msg_detail) {
         if (isInRect(x, y, _content_x + 4, _list_y + 4, 70, 16)) {
           _show_msg_detail = false;
           return true;
         }
         return true;
+      }
+
+      // Dropdown button
+      if (isInRect(x, y, _content_x + 4, _list_y + 4, _content_w - 8, 22)) {
+          _chat_dropdown_open = true;
+          return true;
+      }
+
+      // Input field
+      int input_y = _screen_h - 26;
+      if (isInRect(x, y, _content_x + 1, input_y - 1, _content_w - 2, 26)) {
+          _keyboard_visible = true;
+          return true;
       }
 
       int total = _task->getStoredMessageCount();
@@ -1411,45 +1947,27 @@ public:
       return true;
     }
 
-    if (_tab == TAB_CHAT) {
-        if (_chat_dropdown_open) {
-            int dx = _content_x + 10;
-            int dy = _list_y + 26;
-            int dw = _content_w - 20;
-            if (isInRect(x, y, dx, dy, dw, 120)) {
-                int row = (y - dy - 6) / 20;
-                if (row >= 0 && row < MAX_GROUP_CHANNELS) {
-                    ChannelDetails ch;
-                    if (the_mesh.getChannel(row, ch)) {
-                        _active_chat_idx = row;
-                        _active_chat_is_group = true;
-                    }
-                }
-                _chat_dropdown_open = false;
-                return true;
-            }
-            _chat_dropdown_open = false;
+    if (_tab == TAB_MAP) {
+        int zbx = _content_x + _content_w - 36;
+        // "+" = zoom in (smaller m/px → closer)
+        if (isInRect(x, y, zbx, _list_y + 8, 30, 22)) {
+            _map_zoom /= 2.0f;
+            if (_map_zoom < 0.5f) _map_zoom = 0.5f;
             return true;
         }
-
-        if (isInRect(x, y, _content_x + 4, _list_y + 4, _content_w - 8, 22)) {
-            _chat_dropdown_open = true;
+        // "-" = zoom out (larger m/px → further)
+        if (isInRect(x, y, zbx, _list_y + 34, 30, 22)) {
+            _map_zoom *= 2.0f;
+            if (_map_zoom > 5000.0f) _map_zoom = 5000.0f;
             return true;
         }
-
-        int input_y = _screen_h - 26;
-        if (isInRect(x, y, _content_x + 1, input_y - 1, _content_w - 2, 26)) {
-            _keyboard_visible = true;
-            return true;
-        }
-
-        if (y > _list_y + 30 && y < input_y) {
-            // Scroll history? (Optional)
-        }
+        // Pan: simple tap shifts offset so tapped point becomes new center
+        _map_offset_x += (x - (_content_x + _content_w / 2));
+        _map_offset_y += (y - (_list_y + (_screen_h - _list_y) / 2));
         return true;
     }
 
-    if (_tab == TAB_NEARBY) {
+    if (_tab == TAB_NODES) {
       the_mesh.getRecentlyHeard(recent, UI_RECENT_LIST_SIZE);
       int total = 0;
       for (int i = 0; i < UI_RECENT_LIST_SIZE; i++) {
@@ -1469,7 +1987,7 @@ public:
       return true;
     }
 
-    if (_tab == TAB_RADIO) {
+    if (_tab == TAB_GPS) {
       int left_btn_x = _content_x + 6;
       int right_btn_x = left_btn_x + _radio_toggle_w + 8;
       if (isInRect(x, y, left_btn_x, _radio_toggle_y, _radio_toggle_w, _radio_toggle_h)) {
@@ -1480,30 +1998,30 @@ public:
         _radio_raw_mode = true;
         return true;
       }
-      if (_radio_raw_mode && isInRect(x, y, _content_x + 8, _radio_reset_y, _content_w - 16, _radio_reset_h)) {
+      if (isInRect(x, y, _content_x + 8, _radio_reset_y, _content_w - 16, _radio_reset_h)) {
         radio_driver.resetStats();
         the_mesh.resetStats();
         _task->showAlert("Radio stats reset", 900);
         return true;
       }
-      return true;
-    }
-
-    if (_tab == TAB_LINK) {
-      if (isInRect(x, y, _content_x + 8, _link_ble_btn_y, _content_w - 16, _link_btn_h)) {
-        if (_task->isSerialEnabled()) {
-          _task->disableSerial();
-        } else {
-          _task->enableSerial();
-        }
-        return true;
-      }
-      if (isInRect(x, y, _content_x + 8, _link_adv_btn_y, _content_w - 16, _link_btn_h)) {
+      if (isInRect(x, y, _content_x + 8, _radio_adv_btn_y, _content_w - 16, _link_btn_h)) {
         _task->notify(UIEventType::ack);
         if (the_mesh.advert()) {
           _task->showAlert("Advert sent!", 1000);
         } else {
           _task->showAlert("Advert failed..", 1000);
+        }
+        return true;
+      }
+      return true;
+    }
+
+    if (_tab == TAB_BLE) {
+      if (isInRect(x, y, _content_x + 8, _link_ble_btn_y, _content_w - 16, _link_btn_h)) {
+        if (_task->isSerialEnabled()) {
+          _task->disableSerial();
+        } else {
+          _task->enableSerial();
         }
         return true;
       }
@@ -1757,7 +2275,7 @@ void UITask::newMsg(uint8_t path_len, const char* from_name, const char* text, i
   
   if (home != NULL) {
       HomeScreen* hs = (HomeScreen*)home;
-      hs->setUnread(HomeScreen::TAB_MESSAGES);
+      hs->setUnread(HomeScreen::TAB_CHAT);
       if (channel_idx != 0xFF || is_group) {
           hs->setUnread(HomeScreen::TAB_CHAT);
       }

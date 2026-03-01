@@ -140,6 +140,12 @@ void ST7789LCDDisplay::setColor(Color c) {
     case DisplayDriver::DARK_GREEN :
       _color = 0x03E0; // Dark Green (RGB565)
       break;
+    case DisplayDriver::CHARCOAL :
+      _color = 0x18C3; // #1A1A1A
+      break;
+    case DisplayDriver::DARK_GREY :
+      _color = 0x2945; // #2C2C2C
+      break;
     default:
       _color = ST77XX_WHITE;
       break;
@@ -169,6 +175,34 @@ void ST7789LCDDisplay::drawRoundRect(int x, int y, int w, int h, int r) {
 
 void ST7789LCDDisplay::fillRoundRect(int x, int y, int w, int h, int r) {
   if (_canvas) _canvas->fillRoundRect(x * DISPLAY_SCALE_X, y * DISPLAY_SCALE_Y, w * DISPLAY_SCALE_X, h * DISPLAY_SCALE_Y, r * DISPLAY_SCALE_X, _color);
+}
+
+void ST7789LCDDisplay::drawLine(int x0, int y0, int x1, int y1) {
+  if (_canvas) _canvas->drawLine(x0 * DISPLAY_SCALE_X, y0 * DISPLAY_SCALE_Y, x1 * DISPLAY_SCALE_X, y1 * DISPLAY_SCALE_Y, _color);
+}
+
+void ST7789LCDDisplay::drawFastHLine(int x, int y, int w) {
+  if (_canvas) _canvas->drawFastHLine(x * DISPLAY_SCALE_X, y * DISPLAY_SCALE_Y, w * DISPLAY_SCALE_X, _color);
+}
+
+void ST7789LCDDisplay::drawFastVLine(int x, int y, int h) {
+  if (_canvas) _canvas->drawFastVLine(x * DISPLAY_SCALE_X, y * DISPLAY_SCALE_Y, h * DISPLAY_SCALE_Y, _color);
+}
+
+void ST7789LCDDisplay::drawCircle(int x, int y, int r) {
+  if (_canvas) _canvas->drawCircle(x * DISPLAY_SCALE_X, y * DISPLAY_SCALE_Y, r * DISPLAY_SCALE_X, _color);
+}
+
+void ST7789LCDDisplay::fillCircle(int x, int y, int r) {
+  if (_canvas) _canvas->fillCircle(x * DISPLAY_SCALE_X, y * DISPLAY_SCALE_Y, r * DISPLAY_SCALE_X, _color);
+}
+
+void ST7789LCDDisplay::drawTriangle(int x0, int y0, int x1, int y1, int x2, int y2) {
+  if (_canvas) _canvas->drawTriangle(x0 * DISPLAY_SCALE_X, y0 * DISPLAY_SCALE_Y, x1 * DISPLAY_SCALE_X, y1 * DISPLAY_SCALE_Y, x2 * DISPLAY_SCALE_X, y2 * DISPLAY_SCALE_Y, _color);
+}
+
+void ST7789LCDDisplay::fillTriangle(int x0, int y0, int x1, int y1, int x2, int y2) {
+  if (_canvas) _canvas->fillTriangle(x0 * DISPLAY_SCALE_X, y0 * DISPLAY_SCALE_Y, x1 * DISPLAY_SCALE_X, y1 * DISPLAY_SCALE_Y, x2 * DISPLAY_SCALE_X, y2 * DISPLAY_SCALE_Y, _color);
 }
 
 void ST7789LCDDisplay::drawXbm(int x, int y, const uint8_t* bits, int w, int h) {

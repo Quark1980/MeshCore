@@ -8,7 +8,7 @@ class DisplayDriver {
 protected:
   DisplayDriver(int w, int h) { _w = w; _h = h; }
 public:
-  enum Color { DARK=0, LIGHT, GREY, RED, GREEN, BLUE, YELLOW, ORANGE, DARK_GREEN, NEON_CYAN, SLATE_GREY }; // on b/w screen, colors will be !=0 synonym of light
+  enum Color { DARK=0, LIGHT, GREY, RED, GREEN, BLUE, YELLOW, ORANGE, DARK_GREEN, NEON_CYAN, SLATE_GREY, CHARCOAL, DARK_GREY }; // on b/w screen, colors will be !=0 synonym of light
 
   int width() const { return _w; }
   int height() const { return _h; }
@@ -27,6 +27,13 @@ public:
   virtual void drawRect(int x, int y, int w, int h) = 0;
   virtual void drawRoundRect(int x, int y, int w, int h, int r) = 0;
   virtual void fillRoundRect(int x, int y, int w, int h, int r) = 0;
+  virtual void drawLine(int x0, int y0, int x1, int y1) = 0;
+  virtual void drawFastHLine(int x, int y, int w) = 0;
+  virtual void drawFastVLine(int x, int y, int h) = 0;
+  virtual void drawCircle(int x, int y, int r) = 0;
+  virtual void fillCircle(int x, int y, int r) = 0;
+  virtual void drawTriangle(int x0, int y0, int x1, int y1, int x2, int y2) = 0;
+  virtual void fillTriangle(int x0, int y0, int x1, int y1, int x2, int y2) = 0;
   virtual void drawXbm(int x, int y, const uint8_t* bits, int w, int h) = 0;
   virtual uint16_t getTextWidth(const char* str) = 0;
   virtual void drawTextCentered(int mid_x, int y, const char* str) {   // helper method (override to optimise)

@@ -65,6 +65,13 @@ public:
   void drawRect(int x, int y, int w, int h) override;
   void drawRoundRect(int x, int y, int w, int h, int r) override;
   void fillRoundRect(int x, int y, int w, int h, int r) override;
+  void drawLine(int x0, int y0, int x1, int y1) override;
+  void drawFastHLine(int x, int y, int w) override;
+  void drawFastVLine(int x, int y, int h) override;
+  void drawCircle(int x, int y, int r) override;
+  void fillCircle(int x, int y, int r) override;
+  void drawTriangle(int x0, int y0, int x1, int y1, int x2, int y2) override;
+  void fillTriangle(int x0, int y0, int x1, int y1, int x2, int y2) override;
   void drawXbm(int x, int y, const uint8_t* bits, int w, int h) override;
   uint16_t getTextWidth(const char* str) override;
   void endFrame() override;
