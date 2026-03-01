@@ -360,7 +360,12 @@ private:
     display.setColor(DisplayDriver::DARK);
     display.fillRect(0, 0, _screen_w, _screen_h);
 
-    // Battery & Node Name parsing remains the same
+    // Slim Status Bar at top
+    int status_h = 24;
+    display.setColor(DisplayDriver::SLATE_GREY);
+    display.drawRect(0, 0, _screen_w, status_h);
+    
+    // Battery & Node Name
     char node[sizeof(_node_prefs->node_name)];
     display.translateUTF8ToBlocks(node, _node_prefs->node_name, sizeof(node));
     int batt_mv = _task->getBattMilliVolts();
@@ -368,71 +373,74 @@ private:
     if (batt_pct < 0) batt_pct = 0;
     if (batt_pct > 100) batt_pct = 100;
 
-    int batt_w = 22;
+    int batt_w = 20;
     int batt_h = 9;
-    int batt_x = _content_x + _content_w - batt_w - 8;
-    int batt_y = 4;
+    int batt_x = _screen_w - batt_w - 6;
+    int batt_y = (status_h - batt_h) / 2;
 
-    display.setColor(DisplayDriver::LIGHT);
+    display.setColor(DisplayDriver::SLATE_GREY);
     display.drawRect(batt_x, batt_y, batt_w, batt_h);
     display.fillRect(batt_x + batt_w, batt_y + 2, 2, batt_h - 4);
     int batt_fill = ((batt_w - 2) * batt_pct) / 100;
     if (batt_fill > 0) {
-      display.setColor(DisplayDriver::LIGHT);
+      display.setColor(DisplayDriver::NEON_CYAN);
       display.fillRect(batt_x + 1, batt_y + 1, batt_fill, batt_h - 2);
     }
 
-    int node_w = batt_x - _content_x - 8;
-    if (node_w < 20) node_w = 20;
-    display.setColor(DisplayDriver::LIGHT);
-    display.drawTextEllipsized(_content_x + 4, 3, node_w, node);
+    display.setColor(DisplayDriver::LIGHT); // White for node name
+    display.drawTextEllipsized(_rail_w + 6, 6, _content_w - batt_w - 30, node);
 
     char batt_txt[8];
     snprintf(batt_txt, sizeof(batt_txt), "%d%%", batt_pct);
-    display.drawTextRightAlign(batt_x - 4, 4, batt_txt);
+    display.setColor(DisplayDriver::NEON_CYAN);
+    display.drawTextRightAlign(batt_x - 4, 6, batt_txt);
 
+    // Title / Header below status bar
     display.setColor(DisplayDriver::LIGHT);
-    display.drawTextLeftAlign(_content_x + 4, _header_h - 12, title);
+    display.drawTextLeftAlign(_content_x + 4, _header_h - 10, title);
+    
+    // Thin horizontal separator
+    display.setColor(DisplayDriver::SLATE_GREY);
+    display.fillRect(_content_x, _header_h + 2, _content_w, 1);
   }
 
   void drawTabRail(DisplayDriver& display) {
-    int tab_x = 4;
-    int tab_w = _rail_w - 8;
+    int tab_x = 2;
+    int tab_w = _rail_w - 4;
     for (int i = 0; i < TAB_COUNT; i++) {
-      int y = tabY(i);
-      bool active = (i == _tab);
-      bool unread = false;
-      if (i == TAB_MESSAGES && _msg_unread) unread = true;
-      if (i == TAB_CHAT && _chat_unread) unread = true;
+        int y = tabY(i);
+        bool active = (i == _tab);
+        bool unread = false;
+        if (i == TAB_MESSAGES && _msg_unread) unread = true;
+        if (i == TAB_CHAT && _chat_unread) unread = true;
 
-      if (active) {
-          display.setColor(DisplayDriver::BLUE);
-      } else if (unread) {
-          display.setColor(DisplayDriver::DARK_GREEN);
-      } else {
-          display.setColor(DisplayDriver::DARK);
-      }
-      display.fillRect(tab_x, y, tab_w, _tab_h);
+        if (active) {
+            display.setColor(DisplayDriver::NEON_CYAN);
+            display.drawRect(tab_x, y, tab_w, _tab_h);
+            display.drawRect(tab_x + 1, y + 1, tab_w - 2, _tab_h - 2);
+        } else if (unread) {
+            display.setColor(DisplayDriver::DARK_GREEN);
+            display.drawRect(tab_x, y, tab_w, _tab_h);
+        } else {
+            display.setColor(DisplayDriver::SLATE_GREY);
+            display.drawRect(tab_x, y, tab_w, _tab_h);
+        }
 
-      display.setColor(DisplayDriver::LIGHT);
-      display.drawRect(tab_x, y, tab_w, _tab_h);
-
-      display.setColor(DisplayDriver::LIGHT);
-      // Center the text in the newly available space (no icon)
-      display.drawTextCentered(tab_x + tab_w / 2, y + (_tab_h / 2) - 3, tabLabel(i));
+        display.setColor(active ? DisplayDriver::NEON_CYAN : (unread ? DisplayDriver::DARK_GREEN : DisplayDriver::GREY));
+        display.drawTextCentered(tab_x + tab_w / 2, y + (_tab_h / 2) - 3, tabLabel(i));
     }
   }
 
   void drawButton(DisplayDriver& display, int x, int y, int w, int h, const char* label, bool active) {
     if (w < 8 || h < 8) return;
 
-    display.setColor(active ? DisplayDriver::BLUE : DisplayDriver::DARK);
-    display.fillRect(x, y, w, h);
-
-    display.setColor(DisplayDriver::LIGHT);
+    display.setColor(active ? DisplayDriver::NEON_CYAN : DisplayDriver::SLATE_GREY);
     display.drawRect(x, y, w, h);
+    if (active) {
+        display.drawRect(x + 1, y + 1, w - 2, h - 2);
+    }
 
-    display.setColor(DisplayDriver::LIGHT);
+    display.setColor(active ? DisplayDriver::NEON_CYAN : DisplayDriver::LIGHT);
     display.drawTextCentered(x + w / 2, y + (h / 2) - 3, label);
   }
 
@@ -470,12 +478,14 @@ private:
 
       int y = _list_y + i * _row_h;
       bool selected = (idx == _msg_cursor);
-      
-      display.setColor(selected ? DisplayDriver::BLUE : DisplayDriver::DARK);
-      display.fillRect(x + 2, y + 1, list_w - 4, _row_h - 2);
-
-      display.setColor(DisplayDriver::LIGHT);
-      display.drawRect(x + 1, y, list_w - 2, _row_h - 1);
+      display.setColor(selected ? DisplayDriver::NEON_CYAN : DisplayDriver::DARK);
+      if (selected) {
+          display.drawRect(x + 1, y, list_w - 2, _row_h - 1);
+          display.drawRect(x + 2, y + 1, list_w - 4, _row_h - 3);
+      } else {
+          display.setColor(DisplayDriver::SLATE_GREY);
+          display.fillRect(x + 1, y + _row_h - 1, list_w - 2, 1); // Thin separator line at bottom
+      }
 
       char age[8];
       formatAge(e.timestamp, age, sizeof(age));
@@ -592,13 +602,9 @@ private:
       char filtered_name[sizeof(a->name)];
       display.translateUTF8ToBlocks(filtered_name, a->name, sizeof(filtered_name));
 
-      display.setColor(DisplayDriver::DARK);
-      display.fillRect(x + 2, y + 1, list_w - 4, _row_h - 2);
-
-      display.setColor(DisplayDriver::LIGHT);
-      display.drawRect(x + 1, y, list_w - 2, _row_h - 1);
       display.setColor(DisplayDriver::LIGHT);
       display.drawTextEllipsized(x + 6, y + 4, max_name_w, filtered_name);
+      display.setColor(DisplayDriver::NEON_CYAN); // Neon for age
       display.drawTextRightAlign(x + list_w - 4, y + 4, age);
     }
 
@@ -688,14 +694,14 @@ private:
     int kb_y = _screen_h - kb_h;
     display.setColor(DisplayDriver::DARK);
     display.fillRect(0, kb_y, _screen_w, kb_h);
-    display.setColor(DisplayDriver::LIGHT);
+    display.setColor(DisplayDriver::SLATE_GREY);
     display.drawRect(0, kb_y, _screen_w, kb_h);
 
     // Text Preview at top of keyboard
     display.setColor(DisplayDriver::DARK);
-    display.fillRect(2, kb_y + 2, _screen_w - 4, 28);
-    display.setColor(DisplayDriver::LIGHT);
-    display.drawRect(1, kb_y + 1, _screen_w - 2, 30);
+    display.fillRect(2, kb_y + 2, _screen_w - 4, 30);
+    display.setColor(DisplayDriver::SLATE_GREY);
+    display.drawRect(1, kb_y + 1, _screen_w - 2, 32);
     if (_chat_draft[0] == 0) {
         display.setColor(DisplayDriver::GREY);
         display.drawTextLeftAlign(6, kb_y + 8, "Type message...");
@@ -743,8 +749,9 @@ private:
   void drawKey(DisplayDriver& display, int x, int y, int w, int h, const char* label) {
     display.setColor(DisplayDriver::DARK);
     display.fillRect(x, y, w, h);
+    display.setColor(DisplayDriver::SLATE_GREY);
+    display.drawRect(x, y, w, h); // Cyber-tech: Always use slate grey for inactive keys
     display.setColor(DisplayDriver::LIGHT);
-    display.drawRect(x, y, w, h);
     display.drawTextCentered(x + w / 2, y + (h - 12) / 2, label);
   }
 
@@ -760,9 +767,10 @@ private:
     // Static channels for now: Public + any custom
     for (int i = 0; i < 4; i++) {
         ChannelDetails ch;
-        if (the_mesh.getChannel(i, ch)) {
-            display.drawTextLeftAlign(dx + 6, dy + 6 + i * 20, ch.name);
-        }
+      display.setColor(i == _active_chat_idx ? DisplayDriver::NEON_CYAN : DisplayDriver::SLATE_GREY);
+      display.drawRect(dx, dy + i * 20, dw, 20);
+      display.setColor(i == _active_chat_idx ? DisplayDriver::NEON_CYAN : DisplayDriver::LIGHT);
+      display.drawTextLeftAlign(dx + 6, dy + 4 + i * 20, ch.name);
     }
   }
 
@@ -796,6 +804,7 @@ private:
       snprintf(tmp, sizeof(tmp), "TX Power: %ddBm", _node_prefs->tx_power_dbm);
       display.drawTextLeftAlign(x + 6, y, tmp);
       y += 13;
+      display.setColor(DisplayDriver::NEON_CYAN);
       snprintf(tmp, sizeof(tmp), "Noise Floor: %d", radio_driver.getNoiseFloor());
       display.drawTextLeftAlign(x + 6, y, tmp);
       y += 16;
@@ -844,14 +853,21 @@ private:
     display.setColor(DisplayDriver::DARK);
     display.fillRect(x, _list_y, w, panel_h);
 
-    display.setColor(DisplayDriver::DARK);
-    display.fillRect(x + 6, _list_y + 6, w - 12, 18);
+    display.setColor(DisplayDriver::SLATE_GREY);
+    display.drawRect(x + 4, _list_y + 4, w - 8, panel_h - 8);
+
+    display.setColor(DisplayDriver::NEON_CYAN);
+    display.drawTextCentered(x + w / 2, _list_y + 16, "CONNECTION STATUS");
+    
+    display.setColor(DisplayDriver::SLATE_GREY);
+    display.fillRect(x + 10, _list_y + 32, w - 20, 1);
     if (_task->hasConnection()) {
-      display.setColor(DisplayDriver::LIGHT);
-      display.fillRect(x + 7, _list_y + 7, w - 14, 16);
-      display.setColor(DisplayDriver::DARK);
+      display.setColor(DisplayDriver::NEON_CYAN);
+      display.drawRect(x + 6, _list_y + 6, w - 12, 18);
+      display.drawRect(x + 7, _list_y + 7, w - 14, 16);
+      display.setColor(DisplayDriver::NEON_CYAN);
     } else {
-      display.setColor(DisplayDriver::LIGHT);
+      display.setColor(DisplayDriver::LIGHT); // Dimmer white for disconnected
     }
     display.drawTextCentered(x + w / 2, _list_y + 11, _task->hasConnection() ? "Connected" : "Disconnected");
 
@@ -885,14 +901,12 @@ private:
     drawButton(display, x + 8, _power_btn_y, w - 16, _power_btn_h, "", _power_armed);
 
     if (_power_armed && (int32_t)(_power_armed_until - millis()) > 0) {
-      display.setColor(DisplayDriver::DARK);
+      display.setColor(DisplayDriver::NEON_CYAN);
       display.drawTextCentered(x + w / 2, _power_btn_y + (_power_btn_h / 2) - 9, "Tap Again To");
       display.drawTextCentered(x + w / 2, _power_btn_y + (_power_btn_h / 2) + 3, "Hibernate");
     } else {
-      _power_armed = false;
       display.setColor(DisplayDriver::LIGHT);
-      display.drawTextCentered(x + w / 2, _power_btn_y + (_power_btn_h / 2) - 9, "Touch To");
-      display.drawTextCentered(x + w / 2, _power_btn_y + (_power_btn_h / 2) + 3, "Hibernate");
+      display.drawTextCentered(x + w / 2, _power_btn_y + (_power_btn_h / 2) - 3, "Hibernate");
     }
   }
 
